@@ -65,32 +65,86 @@ window.removeQuoteLine = (idx) => {
   renderQuotePreview();
 };
 
-/* ---------- Historial de Presupuestos ---------- */
+/* ---------- Historial de Presupuestos (con Buscador y Modal Detalle) ---------- */
 async function loadHistory() {
+  const searchInput = $('#search-history');
+  const qFilter = searchInput ? searchInput.value.trim().toLowerCase() : '';
+
   const { data, error } = await db.from('quotes').select('*, clients(name, phone)').order('created_at', { ascending: false }).limit(50);
   if (error) return toast(error.message, true);
+
+  let filtered = data || [];
+  if (qFilter) {
+    filtered = filtered.filter(q => {
+      const pCode = quoteCode(q.quote_no).toLowerCase();
+      const cName = (q.clients?.name || '').toLowerCase();
+      return pCode.includes(qFilter) || cName.includes(qFilter);
+    });
+  }
 
   const emptyEl = $('#empty-history');
   const rowsEl = $('#rows-history');
   if (!rowsEl) return;
 
-  emptyEl.hidden = data.length > 0;
-  rowsEl.innerHTML = data.map(q => `
+  emptyEl.hidden = filtered.length > 0;
+  rowsEl.innerHTML = filtered.map(q => `
     <tr>
       <td><strong>${quoteCode(q.quote_no)}</strong></td>
       <td>${new Date(q.created_at).toLocaleDateString('es-ES')}</td>
       <td>${esc(q.clients?.name || 'Cliente general')}</td>
       <td><span style="padding: 2px 8px; border-radius: 4px; font-size: 11px; background: #e3f1e8; color: var(--primary);">${esc(q.status)}</span></td>
       <td><strong>${Number(q.total).toFixed(2)} €</strong></td>
-      <td class="muted">${esc(q.notes || '-')}</td>
+      <td>
+        <button class="btn ghost" type="button" onclick="viewQuoteDetail('${q.id}')" style="padding: 4px 10px; font-size: 12px;">Ver / Recuperar</button>
+      </td>
     </tr>
   `).join('');
+}
+
+let historySearchTimer;
+const searchHistoryEl = $('#search-history');
+if (searchHistoryEl) {
+  searchHistoryEl.addEventListener('input', () => {
+    clearTimeout(historySearchTimer);
+    historySearchTimer = setTimeout(loadHistory, 250);
+  });
+}
+
+window.viewQuoteDetail = async (quoteId) => {
+  const { data: quote, error } = await db.from('quotes').select('*, clients(*)').eq('id', quoteId).single();
+  if (error || !quote) return toast('No se pudo cargar el presupuesto', true);
+
+  const { data: lines } = await db.from('quote_lines').select('*').eq('quote_id', quoteId).order('pos');
+
+  $('#modal-quote-title').textContent = `Presupuesto ${quoteCode(quote.quote_no)}`;
+  $('#modal-quote-client-info').innerHTML = `
+    <strong>Cliente:</strong> ${esc(quote.clients?.name)} (${esc(quote.clients?.phone || 'Sin teléfono')})<br>
+    <strong>Localidad:</strong> ${esc(quote.clients?.locality || 'No especificada')} | <strong>Fecha:</strong> ${new Date(quote.created_at).toLocaleDateString('es-ES')}
+  `;
+
+  const tbody = $('#modal-quote-lines');
+  tbody.innerHTML = (lines || []).map(l => `
+    <tr>
+      <td><strong>${esc(l.service_name)}</strong>${l.description ? '<br><small class="muted">' + esc(l.description) + '</small>' : ''}</td>
+      <td>${l.qty} ${esc(l.unit)}</td>
+      <td>${Number(l.unit_price).toFixed(2)} €</td>
+      <td><strong>${Number(l.unit_price * l.qty).toFixed(2)} €</strong></td>
+    </tr>
+  `).join('');
+
+  $('#modal-quote-total').textContent = Number(quote.total).toFixed(2) + ' €';
+  $('#dlg-quote-detail').showModal();
+};
+
+const modalQuoteClose = $('#modal-quote-close');
+if (modalQuoteClose) {
+  modalQuoteClose.addEventListener('click', () => $('#dlg-quote-detail').close());
 }
 
 document.addEventListener('DOMContentLoaded', () => {
   cacheServices();
 
-  // Navegación de la barra lateral
+  // Navegación lateral
   const navButtons = document.querySelectorAll('.sidebar .nav-btn');
   const sections = document.querySelectorAll('.main-content .tab-section');
 
@@ -128,7 +182,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Botón para añadir suplemento al presupuesto en la derecha
   const btnAddExtra = $('#b-add-extra');
   if (btnAddExtra) {
     btnAddExtra.addEventListener('click', () => {
@@ -152,7 +205,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Desplegables en cascada (Categoría -> Subtipo -> Checks)
+  // Desplegables en cascada
   const categorySelect = $('#pres_category');
   const subserviceContainer = $('#subservice-container');
   const subserviceSelect = $('#pres_subservice');
@@ -214,7 +267,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Botón "Añadir servicios seleccionados al presupuesto"
   const btnAddLines = $('#b-add-lines');
   if (btnAddLines) {
     btnAddLines.addEventListener('click', () => {
@@ -247,7 +299,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Botón limpiar formulario completo y resumen
   const btnResetPresupuesto = $('#b-reset-presupuesto');
   const formPresupuesto = $('#f-presupuesto');
   if (btnResetPresupuesto && formPresupuesto) {
@@ -266,7 +317,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Guardar y Emitir Presupuesto en Supabase
   const btnSaveQuote = $('#b-save-presupuesto');
   if (btnSaveQuote) {
     btnSaveQuote.addEventListener('click', async () => {
@@ -295,7 +345,7 @@ document.addEventListener('DOMContentLoaded', () => {
           if (duplicates.length > 0) {
             clientId = duplicates[0].id;
           } else {
-            const newClient = { name, phone, email, locality, kind: 'particular', notes: 'Cliente registrado automáticamente desde Presupuestos.' };
+            const newClient = { name, phone, email, locality, kind: 'particular', notes: 'Cliente registrado automáticamente.' };
             const { data: createdClient, error: clientErr } = await db.from('clients').insert(newClient).select().single();
             if (clientErr) {
               toast('Error al crear el cliente: ' + clientErr.message, true);
@@ -391,7 +441,7 @@ $('#f-recovery').addEventListener('submit', async (e) => {
 });
 $('#b-logout').addEventListener('click', () => db.auth.signOut());
 
-/* ---------- Tabla de Servicios (Supabase) ---------- */
+/* ---------- Tabla de Servicios (con Borrado Individual y Masivo) ---------- */
 async function loadServicesTable() {
   const { data, error } = await db.from('services').select('*').order('pos');
   if (error) return toast(error.message, true);
@@ -402,17 +452,74 @@ async function loadServicesTable() {
 
   emptyEl.hidden = data.length > 0;
   rowsEl.innerHTML = data.map(s => 
-    `<tr data-id="${s.id}">
+    `<tr data-id="${s.id}" tabindex="0">
+       <td onclick="event.stopPropagation()"><input type="checkbox" class="service-row-select" value="${esc(s.id)}" aria-label="Seleccionar servicio"></td>
        <td>${esc(s.category || 'General')}</td>
        <td><strong>${esc(s.name)}</strong></td>
        <td>${esc(s.unit)}</td>
        <td>${s.price !== null ? Number(s.price).toFixed(2) + ' €' : 'A medida'}</td>
-       <td>
-         <button class="btn ghost" type="button" onclick="editService('${s.id}')">Editar</button>
+       <td onclick="event.stopPropagation()">
+         <button class="btn ghost" type="button" onclick="editService('${s.id}')" style="padding: 4px 8px; font-size: 11px; margin-right: 4px;">Editar</button>
+         <button class="btn ghost red" type="button" onclick="deleteService('${s.id}')" style="padding: 4px 8px; font-size: 11px;">Eliminar</button>
        </td>
      </tr>`
   ).join('');
+
+  actualizarBotonEliminarServicios();
 }
+
+function actualizarBotonEliminarServicios() {
+  const sel = document.querySelectorAll('.service-row-select:checked');
+  const btn = $('#b-delete-selected-services');
+  if (btn) btn.hidden = sel.length === 0;
+}
+
+const serviceRowsEl = $('#rows-services');
+if (serviceRowsEl) {
+  serviceRowsEl.addEventListener('change', (e) => {
+    if (e.target.classList.contains('service-row-select')) {
+      actualizarBotonEliminarServicios();
+    }
+  });
+}
+
+const selectAllServicesCheckbox = $('#select-all-services');
+if (selectAllServicesCheckbox) {
+  selectAllServicesCheckbox.addEventListener('change', (e) => {
+    document.querySelectorAll('.service-row-select').forEach(chk => chk.checked = e.target.checked);
+    actualizarBotonEliminarServicios();
+  });
+}
+
+const btnDeleteSelectedServices = $('#b-delete-selected-services');
+if (btnDeleteSelectedServices) {
+  btnDeleteSelectedServices.addEventListener('click', async () => {
+    const ids = Array.from(document.querySelectorAll('.service-row-select:checked')).map(chk => chk.value);
+    if (ids.length === 0) return;
+    if (!confirm(`¿Eliminar los ${ids.length} servicios seleccionados?`)) return;
+
+    btnDeleteSelectedServices.disabled = true;
+    try {
+      const { error } = await db.from('services').delete().in('id', ids);
+      if (error) return toast(error.message, true);
+      toast('Servicios eliminados correctamente');
+      if (selectAllServicesCheckbox) selectAllServicesCheckbox.checked = false;
+      loadServicesTable();
+      cacheServices();
+    } finally {
+      btnDeleteSelectedServices.disabled = false;
+    }
+  });
+}
+
+window.deleteService = async (id) => {
+  if (!confirm('¿Estás seguro de eliminar este servicio?')) return;
+  const { error } = await db.from('services').delete().eq('id', id);
+  if (error) return toast(error.message, true);
+  toast('Servicio eliminado');
+  loadServicesTable();
+  cacheServices();
+};
 
 const bNewService = $('#b-new-service');
 if (bNewService) {
