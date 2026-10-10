@@ -41,13 +41,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
       if (target === 'clientes') {
         loadClients();
-      } else if (target === 'presupuestos') {
-        loadClientsForDatalist();
       }
     });
   });
-
-  loadClientsForDatalist();
 });
 
 /* ---------- Sesión ---------- */
@@ -85,40 +81,71 @@ $('#f-recovery').addEventListener('submit', async (e) => {
 });
 $('#b-logout').addEventListener('click', () => db.auth.signOut());
 
-/* ---------- Búsqueda y Autocompletado por Teléfono en Presupuestos ---------- */
-let allClientsForDatalist = [];
-
-async function loadClientsForDatalist() {
-  const { data } = await db.from('clients').select('id, code_num, name, phone, email, locality').order('name');
-  if (!data) return;
-  allClientsForDatalist = data;
-  
-  const datalist = $('#phones-list');
-  if (datalist) {
-    datalist.innerHTML = data.map(c => 
-      `<option value="${esc(c.phone)}">${esc(c.name)} (${code(c.code_num)})</option>`
-    ).join('');
-  }
-}
-
+/* ---------- Búsqueda Dinámica por Teléfono en Presupuestos ---------- */
+let phoneSearchTimer;
 const presPhoneInput = $('#pres_phone');
-if (presPhoneInput) {
+const suggestionsBox = $('#phone-suggestions');
+
+if (presPhoneInput && suggestionsBox) {
   presPhoneInput.addEventListener('input', (e) => {
-    const val = digits(e.target.value);
-    const found = allClientsForDatalist.find(c => digits(c.phone) === val || c.phone.includes(val));
-    
-    if (found && val.length >= 4) {
-      $('#pres_name').value = found.name;
-      $('#pres_email').value = found.email || '';
-      $('#pres_locality').value = found.locality || 'No especificada';
-      $('#pres_client_code').value = code(found.code_num);
-      $('#pres_client_code').dataset.id = found.id;
-    } else if (!val) {
+    clearTimeout(phoneSearchTimer);
+    const q = e.target.value.trim();
+
+    // Si borran el campo, limpiamos los datos asociados
+    if (!q) {
+      suggestionsBox.style.display = 'none';
+      suggestionsBox.innerHTML = '';
       $('#pres_name').value = '';
       $('#pres_email').value = '';
       $('#pres_locality').value = 'No especificada';
       $('#pres_client_code').value = '';
       delete $('#pres_client_code').dataset.id;
+      return;
+    }
+
+    // Buscar solo a partir de 4 caracteres para evitar consultas innecesarias con bases de datos grandes
+    if (q.length < 4) {
+      suggestionsBox.style.display = 'none';
+      return;
+    }
+
+    phoneSearchTimer = setTimeout(async () => {
+      const { data, error } = await db.rpc('search_clients', { q });
+      if (error || !data || data.length === 0) {
+        suggestionsBox.style.display = 'none';
+        return;
+      }
+
+      // Mostrar resultados en la lista flotante
+      suggestionsBox.innerHTML = data.map(c => 
+        `<div class="suggestion-item" data-id="${c.id}" data-name="${esc(c.name)}" data-phone="${esc(c.phone)}" data-email="${esc(c.email || '')}" data-locality="${esc(c.locality)}" data-code="${code(c.code_num)}" style="padding: 10px; cursor: pointer; border-bottom: 1px solid #eee;">
+           <strong>${esc(c.name)}</strong> <span class="muted">(${esc(c.phone)})</span><br>
+           <small class="muted">${code(c.code_num)} · ${esc(c.locality)}</small>
+         </div>`
+      ).join('');
+      suggestionsBox.style.display = 'block';
+    }, 300);
+  });
+
+  // Seleccionar elemento de la lista flotante
+  suggestionsBox.addEventListener('click', (e) => {
+    const item = e.target.closest('.suggestion-item');
+    if (!item) return;
+
+    presPhoneInput.value = item.dataset.phone;
+    $('#pres_name').value = item.dataset.name;
+    $('#pres_email').value = item.dataset.email;
+    $('#pres_locality').value = item.dataset.locality;
+    $('#pres_client_code').value = item.dataset.code;
+    $('#pres_client_code').dataset.id = item.dataset.id;
+
+    suggestionsBox.style.display = 'none';
+  });
+
+  // Ocultar sugerencias si se hace clic fuera
+  document.addEventListener('click', (e) => {
+    if (!presPhoneInput.contains(e.target) && !suggestionsBox.contains(e.target)) {
+      suggestionsBox.style.display = 'none';
     }
   });
 }
@@ -134,7 +161,6 @@ $('#f-presupuesto').addEventListener('submit', async (e) => {
     const name = f.elements['pres_name'].value.trim();
     const email = f.elements['pres_email'].value.trim() || null;
     const locality = f.elements['pres_locality'].value.trim() || 'No especificada';
-    const serviceName = f.elements['pres_service'].value;
     const notes = f.elements['pres_notes'].value.trim() || null;
 
     if (digits(phone).length < 9) {
@@ -144,7 +170,6 @@ $('#f-presupuesto').addEventListener('submit', async (e) => {
 
     let clientId = $('#pres_client_code').dataset.id;
 
-    // Si no está vinculado, buscamos por duplicado o creamos uno nuevo
     if (!clientId) {
       const duplicates = await findDuplicates({ phone, email });
       if (duplicates.length > 0) {
@@ -167,7 +192,6 @@ $('#f-presupuesto').addEventListener('submit', async (e) => {
       }
     }
 
-    // Insertar el presupuesto en la tabla quotes[cite: 2]
     const newQuote = {
       client_id: clientId,
       status: 'borrador',
@@ -189,7 +213,6 @@ $('#f-presupuesto').addEventListener('submit', async (e) => {
     f.reset();
     $('#pres_client_code').value = '';
     delete $('#pres_client_code').dataset.id;
-    loadClientsForDatalist();
   } finally {
     btn.disabled = false;
   }
