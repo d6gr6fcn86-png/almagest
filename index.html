@@ -6,6 +6,8 @@
   <meta name="robots" content="noindex, nofollow">
   <title>AlmaGest</title>
   <link rel="stylesheet" href="css/styles.css">
+  <!-- Librería para generación de PDF en el navegador -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 </head>
 <body>
   <main id="v-login" class="center" hidden>
@@ -191,7 +193,7 @@
         <section id="sec-clientes" class="tab-section" hidden>
           <div class="bar">
             <input id="search" type="search" placeholder="Buscar por nombre, teléfono, correo o localidad" aria-label="Buscar cliente">
-            <button id="b-delete-selected" class="btn ghost red" type="button" hidden>Eliminar seleccionados</button>
+            <button id="b-delete-selected" class="btn ghost red" type="button" hidden style="margin-right: 10px;">Eliminar seleccionados</button>
             <button id="b-new" class="btn" type="button">Nuevo cliente</button>
           </div>
           <div class="card tablebox">
@@ -292,33 +294,80 @@
     </form>
   </dialog>
 
-  <!-- MODAL DETALLE / RECUPERAR PRESUPUESTO -->
-  <dialog id="dlg-quote-detail" style="width: min(700px, 94vw);">
+  <!-- MODAL PREVISUALIZACIÓN Y ENVÍO DE PRESUPUESTO (PDF / WhatsApp / Email) -->
+  <dialog id="dlg-quote-preview" style="width: min(850px, 94vw);">
     <div>
-      <h2 id="modal-quote-title">Detalle del Presupuesto</h2>
-      <div id="modal-quote-client-info" class="card" style="margin-bottom: 12px; background: #f8fbf9; padding: 12px;"></div>
-      
-      <div class="tablebox" style="max-height: 250px; overflow-y: auto; margin-bottom: 12px;">
-        <table class="preview-table">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+        <h2 id="preview-modal-title" style="margin: 0;">Presupuesto Emitido</h2>
+        <div style="display: flex; gap: 8px;">
+          <label style="display: flex; align-items: center; gap: 6px; font-size: 12px; margin: 0;">
+            Estado:
+            <select id="quote-status-select" style="padding: 4px 8px; min-height: 28px;">
+              <option value="borrador">Borrador</option>
+              <option value="emitido">Emitido</option>
+              <option value="aceptado">Aceptado</option>
+              <option value="rechazado">Rechazado</option>
+              <option value="facturado">Facturado</option>
+            </select>
+          </label>
+        </div>
+      </div>
+
+      <!-- Contenedor oculto o renderizado que sirve de plantilla para exportar a PDF -->
+      <div id="pdf-printable-area" style="background: #fff; padding: 30px; border: 1px solid var(--border); border-radius: 8px; font-family: Arial, sans-serif; color: #163D2D; margin-bottom: 16px;">
+        <div style="display: flex; justify-content: space-between; border-bottom: 2px solid #164B38; padding-bottom: 15px; margin-bottom: 20px;">
+          <div>
+            <h1 style="color: #164B38; font-size: 24px; margin: 0;">ALMAGEST</h1>
+            <p style="margin: 4px 0 0; font-size: 12px; color: #4A6A5A;">Servicios Profesionales Integrales</p>
+          </div>
+          <div style="text-align: right;">
+            <strong id="pdf-q-code" style="font-size: 16px; color: #164B38;">P-0000</strong><br>
+            <span id="pdf-q-date" style="font-size: 12px; color: #4A6A5A;">Fecha: 10/10/2026</span>
+          </div>
+        </div>
+
+        <div style="margin-bottom: 20px; font-size: 13px; background: #f8fbf9; padding: 12px; border-radius: 6px;">
+          <strong>Datos del Cliente:</strong><br>
+          <span id="pdf-client-name">Nombre del cliente</span><br>
+          <span id="pdf-client-phone">Teléfono</span> | <span id="pdf-client-locality">Localidad</span>
+        </div>
+
+        <table style="width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 20px;">
           <thead>
-            <tr>
-              <th>Servicio</th>
-              <th>Cantidad</th>
-              <th>Precio Unit.</th>
-              <th>Total</th>
+            <tr style="background: #E3F1E8; color: #164B38;">
+              <th style="padding: 8px; text-align: left; border-bottom: 1px solid #BFD3C6;">Concepto / Servicio</th>
+              <th style="padding: 8px; text-align: center; border-bottom: 1px solid #BFD3C6; width: 60px;">Cant.</th>
+              <th style="padding: 8px; text-align: right; border-bottom: 1px solid #BFD3C6; width: 90px;">Precio Unit.</th>
+              <th style="padding: 8px; text-align: right; border-bottom: 1px solid #BFD3C6; width: 90px;">Total</th>
             </tr>
           </thead>
-          <tbody id="modal-quote-lines"></tbody>
+          <tbody id="pdf-lines-tbody">
+            <!-- Dinámico -->
+          </tbody>
         </table>
+
+        <div style="display: flex; justify-content: flex-end; margin-top: 15px;">
+          <div style="width: 220px; font-size: 14px;">
+            <div style="display: flex; justify-content: space-between; padding: 6px 0; border-top: 2px solid #164B38; font-weight: bold; color: #164B38;">
+              <span>Total Presupuesto:</span>
+              <span id="pdf-q-total">0.00 €</span>
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-top: 40px; font-size: 11px; color: #4A6A5A; text-align: center; border-top: 1px solid #eee; pt: 10px;">
+          AlmaGest — Gestión Comercial y de Servicios. Validez del presupuesto: 30 días.
+        </div>
       </div>
 
-      <div class="preview-total" style="margin-bottom: 0;">
-        <span>Importe Total:</span>
-        <span id="modal-quote-total">0.00 €</span>
-      </div>
-
-      <div class="actions">
-        <button id="modal-quote-close" class="btn ghost" type="button">Cerrar</button>
+      <!-- Acciones de Envio Comercial -->
+      <div style="display: flex; flex-wrap: wrap; gap: 10px; justify-content: space-between; align-items: center; background: #f4f7f5; padding: 12px; border-radius: 8px;">
+        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+          <button id="b-download-pdf" class="btn" type="button">📥 Descargar PDF</button>
+          <button id="b-send-whatsapp" class="btn" type="button" style="background: #25D366;">💚 Enviar WhatsApp</button>
+          <button id="b-send-email" class="btn ghost" type="button">✉️ Enviar Correo</button>
+        </div>
+        <button id="b-close-preview" class="btn ghost" type="button">Cerrar</button>
       </div>
     </div>
   </dialog>
