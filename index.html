@@ -88,10 +88,10 @@
             <input name="pres_sqm" id="pres_sqm" type="number" min="0" step="1" placeholder="Ej. 150">
           </label>
 
-          <!-- Caja informativa de lo que incluye el paquete seleccionado -->
-          <div id="package-details" class="full card" style="display: none; background: #f8fbf9; padding: 12px 16px; border-color: var(--border);">
-            <strong style="font-size: 12px; color: var(--brand); display: block; margin-bottom: 4px;">Servicios incluidos en este paquete:</strong>
-            <p id="package-description" class="muted" style="margin: 0; font-size: 13px;"></p>
+          <!-- Caja de checks de tareas incluidas en el paquete -->
+          <div id="package-details" class="full card" style="display: none; background: #f8fbf9; padding: 14px 16px; border-color: var(--border);">
+            <strong style="font-size: 13px; color: var(--brand); display: block; margin-bottom: 8px;">Ajustar tareas del paquete (desmarca las que no apliquen):</strong>
+            <div id="package-items-list" style="display: flex; flex-direction: column; gap: 6px;"></div>
           </div>
 
           <!-- Checkbox para activar suplemento opcional -->
