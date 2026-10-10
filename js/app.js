@@ -57,13 +57,13 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Alternar visibilidad de los campos de suplemento opcional
+// Alternar visibilidad de los campos de suplemento opcional
   const chkToggleExtra = $('#chk-toggle-extra');
   const extraContainer = $('#extra-fields-container');
   if (chkToggleExtra && extraContainer) {
     chkToggleExtra.addEventListener('change', (e) => {
       if (e.target.checked) {
-        extraContainer.style.display = 'grid';
+        extraContainer.style.display = 'block';
       } else {
         extraContainer.style.display = 'none';
         $('#pres_extra_concept').value = '';
