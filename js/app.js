@@ -22,7 +22,7 @@ function toast(msg, isErr = false) {
   toastTimer = setTimeout(() => (t.hidden = true), 4000);
 }
 
-/* ---------- Gestión de Pestañas ---------- */
+/* ---------- Gestión de Pestañas y Ajustes (Servicios) ---------- */
 document.addEventListener('DOMContentLoaded', () => {
   const tabs = document.querySelectorAll('header nav .tab');
   const sections = document.querySelectorAll('.tab-section');
@@ -44,6 +44,18 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
   });
+
+  // Botón de ajustes (rueda dentada ⚙) para abrir la tabla de servicios
+  const btnSettings = $('#b-settings');
+  if (btnSettings) {
+    btnSettings.addEventListener('click', () => {
+      tabs.forEach(t => t.classList.remove('on'));
+      sections.forEach(sec => {
+        sec.hidden = sec.id !== 'sec-services';
+      });
+      loadServicesTable();
+    });
+  }
 });
 
 /* ---------- Sesión ---------- */
@@ -81,6 +93,95 @@ $('#f-recovery').addEventListener('submit', async (e) => {
 });
 $('#b-logout').addEventListener('click', () => db.auth.signOut());
 
+/* ---------- Tabla de Servicios (Supabase) ---------- */
+async function loadServicesTable() {
+  const { data, error } = await db.from('services').select('*').order('pos');
+  if (error) return toast(error.message, true);
+
+  const emptyEl = $('#empty-services');
+  const rowsEl = $('#rows-services');
+  if (!rowsEl) return;
+
+  emptyEl.hidden = data.length > 0;
+  rowsEl.innerHTML = data.map(s => 
+    `<tr data-id="${s.id}">
+       <td>${esc(s.category || 'General')}</td>
+       <td><strong>${esc(s.name)}</strong></td>
+       <td>${esc(s.unit)}</td>
+       <td>${s.price !== null ? Number(s.price).toFixed(2) + ' €' : 'A medida'}</td>
+       <td>
+         <button class="btn ghost" type="button" onclick="editService('${s.id}')">Editar</button>
+       </td>
+     </tr>`
+  ).join('');
+}
+
+let servicesListCache = [];
+async function cacheServices() {
+  const { data } = await db.from('services').select('*');
+  if (data) servicesListCache = data;
+}
+cacheServices();
+
+const bNewService = $('#b-new-service');
+if (bNewService) {
+  bNewService.addEventListener('click', () => openServiceModal(null));
+}
+
+const dServiceCancel = $('#d-service-cancel');
+if (dServiceCancel) {
+  dServiceCancel.addEventListener('click', () => $('#dlg-service').close());
+}
+
+function openServiceModal(s) {
+  const f = $('#f-service-modal');
+  f.reset();
+  f.dataset.id = s ? s.id : '';
+  $('#d-service-title').textContent = s ? 'Editar Servicio' : 'Nuevo Servicio';
+  if (s) {
+    f.elements['category'].value = s.category || '';
+    f.elements['name'].value = s.name || '';
+    f.elements['unit'].value = s.unit || 'servicio';
+    f.elements['price'].value = s.price || '';
+    f.elements['description'].value = s.description || '';
+  }
+  $('#d-service-err').hidden = true;
+  $('#dlg-service').showModal();
+}
+
+window.editService = async (id) => {
+  const { data } = await db.from('services').select('*').eq('id', id).single();
+  if (data) openServiceModal(data);
+};
+
+$('#f-service-modal').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const f = e.target;
+  const id = f.dataset.id;
+  const v = {
+    category: f.elements['category'].value.trim(),
+    name: f.elements['name'].value.trim(),
+    unit: f.elements['unit'].value,
+    price: parseFloat(f.elements['price'].value) || 0,
+    description: f.elements['description'].value.trim() || null
+  };
+
+  const { error } = id 
+    ? await db.from('services').update(v).eq('id', id)
+    : await db.from('services').insert(v);
+
+  if (error) {
+    $('#d-service-err').textContent = error.message;
+    $('#d-service-err').hidden = false;
+    return;
+  }
+
+  $('#dlg-service').close();
+  toast(id ? 'Servicio actualizado' : 'Servicio creado');
+  loadServicesTable();
+  cacheServices();
+});
+
 /* ---------- Búsqueda Dinámica por Teléfono en Presupuestos ---------- */
 let phoneSearchTimer;
 const presPhoneInput = $('#pres_phone');
@@ -91,7 +192,6 @@ if (presPhoneInput && suggestionsBox) {
     clearTimeout(phoneSearchTimer);
     const q = e.target.value.trim();
 
-    // Si borran el campo, limpiamos los datos asociados
     if (!q) {
       suggestionsBox.style.display = 'none';
       suggestionsBox.innerHTML = '';
@@ -103,7 +203,6 @@ if (presPhoneInput && suggestionsBox) {
       return;
     }
 
-    // Buscar solo a partir de 4 caracteres para evitar consultas innecesarias con bases de datos grandes
     if (q.length < 4) {
       suggestionsBox.style.display = 'none';
       return;
@@ -116,7 +215,6 @@ if (presPhoneInput && suggestionsBox) {
         return;
       }
 
-      // Mostrar resultados en la lista flotante
       suggestionsBox.innerHTML = data.map(c => 
         `<div class="suggestion-item" data-id="${c.id}" data-name="${esc(c.name)}" data-phone="${esc(c.phone)}" data-email="${esc(c.email || '')}" data-locality="${esc(c.locality)}" data-code="${code(c.code_num)}" style="padding: 10px; cursor: pointer; border-bottom: 1px solid #eee;">
            <strong>${esc(c.name)}</strong> <span class="muted">(${esc(c.phone)})</span><br>
@@ -127,7 +225,6 @@ if (presPhoneInput && suggestionsBox) {
     }, 300);
   });
 
-  // Seleccionar elemento de la lista flotante
   suggestionsBox.addEventListener('click', (e) => {
     const item = e.target.closest('.suggestion-item');
     if (!item) return;
@@ -142,7 +239,6 @@ if (presPhoneInput && suggestionsBox) {
     suggestionsBox.style.display = 'none';
   });
 
-  // Ocultar sugerencias si se hace clic fuera
   document.addEventListener('click', (e) => {
     if (!presPhoneInput.contains(e.target) && !suggestionsBox.contains(e.target)) {
       suggestionsBox.style.display = 'none';
@@ -161,6 +257,8 @@ $('#f-presupuesto').addEventListener('submit', async (e) => {
     const name = f.elements['pres_name'].value.trim();
     const email = f.elements['pres_email'].value.trim() || null;
     const locality = f.elements['pres_locality'].value.trim() || 'No especificada';
+    const category = f.elements['pres_category'].value;
+    const subservice = f.elements['pres_subservice'].value;
     const notes = f.elements['pres_notes'].value.trim() || null;
 
     if (digits(phone).length < 9) {
@@ -197,7 +295,7 @@ $('#f-presupuesto').addEventListener('submit', async (e) => {
       status: 'borrador',
       subtotal: 0,
       total: 0,
-      notes: notes
+      notes: `Servicio: ${category} ${subservice ? '(' + subservice + ')' : ''} — ${notes || ''}`
     };
 
     const { data: quoteData, error: quoteErr } = await db.from('quotes').insert(newQuote).select().single();
