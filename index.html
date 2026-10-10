@@ -120,13 +120,14 @@
       </div>
     </section>
 
-    <!-- SECCIÓN / MODAL DE TABLA DE SERVICIOS -->
+<!-- SECCIÓN / TABLA DE SERVICIOS -->
     <section id="sec-services" class="wrap tab-section" hidden>
-      <div class="card tablebox" style="margin: 20px auto; max-width: 900px;">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-          <h2>Catálogo y Tabla de Servicios</h2>
-          <button id="b-new-service" class="btn" type="button">Nuevo Servicio</button>
-        </div>
+      <div class="bar">
+        <h2>Catálogo y Tabla de Servicios</h2>
+        <span class="grow"></span>
+        <button id="b-new-service" class="btn" type="button">Nuevo Servicio</button>
+      </div>
+      <div class="card tablebox">
         <table>
           <thead>
             <tr>
@@ -142,7 +143,6 @@
         <p id="empty-services" class="muted pad" hidden>No hay servicios registrados en la base de datos.</p>
       </div>
     </section>
-  </div>
 
   <!-- MODAL CLIENTE -->
   <dialog id="dlg">
