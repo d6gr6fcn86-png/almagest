@@ -31,14 +31,31 @@
     <header class="top">
       <strong>AlmaGest</strong>
       <nav>
-        <button class="tab on" type="button">Presupuestos</button>
-        <button class="tab" type="button">Clientes</button>
+        <button class="tab on" type="button" data-target="presupuestos">Presupuestos</button>
+        <button class="tab" type="button" data-target="clientes">Clientes</button>
       </nav>
       <span class="grow"></span>
       <button class="icon" type="button" disabled title="Ajustes (próximamente)" aria-label="Ajustes">⚙</button>
       <button id="b-logout" class="link light" type="button">Salir</button>
     </header>
-    <section class="wrap">
+
+    <!-- SECCIÓN DE PRESUPUESTOS -->
+    <section id="sec-presupuestos" class="wrap tab-section">
+      <div class="bar">
+        <input id="search-presupuestos" type="search" placeholder="Buscar presupuestos..." aria-label="Buscar presupuesto">
+        <button id="b-new-presupuesto" class="btn" type="button">Nuevo presupuesto</button>
+      </div>
+      <div class="card tablebox">
+        <table>
+          <thead><tr><th>Código</th><th>Cliente</th><th>Fecha</th><th>Total</th><th>Estado</th></tr></thead>
+          <tbody id="rows-presupuestos"></tbody>
+        </table>
+        <p id="empty-presupuestos" class="muted pad" hidden>Aún no hay presupuestos.</p>
+      </div>
+    </section>
+
+    <!-- SECCIÓN DE CLIENTES -->
+    <section id="sec-clientes" class="wrap tab-section" hidden>
       <div class="bar">
         <input id="search" type="search" placeholder="Buscar por nombre, teléfono, correo o localidad" aria-label="Buscar cliente">
         <button id="b-new" class="btn" type="button">Nuevo cliente</button>
@@ -68,6 +85,8 @@
       </div>
       <p id="d-err" class="error" hidden></p>
       <div class="actions">
+        <button id="d-delete" class="btn ghost red" type="button" hidden>Eliminar cliente</button>
+        <span class="grow"></span>
         <button id="d-cancel" class="btn ghost" type="button">Cancelar</button>
         <button id="d-save" class="btn" type="submit">Guardar</button>
       </div>
@@ -76,7 +95,6 @@
 
   <div id="toast" role="status" hidden></div>
 
-  <!-- Comprueba en https://www.npmjs.com/package/@supabase/supabase-js la última versión 2.x con más de dos semanas -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.109.0"></script>
   <script src="js/config.js"></script>
   <script src="js/app.js"></script>
