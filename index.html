@@ -85,13 +85,21 @@
             </select>
           </label>
 
-          <!-- NUEVOS CAMPOS: Concepto manual / Suplemento extraordinario -->
-          <label class="full">Concepto manual / Suplemento extraordinario (opcional)
-            <input name="pres_extra_concept" id="pres_extra_concept" maxlength="150" placeholder="Ej. Materiales adicionales o trabajo extra específico">
+          <!-- Checkbox para activar suplemento opcional -->
+          <label class="full" style="display: flex; flex-direction: row; align-items: center; gap: 8px; cursor: pointer; margin-top: 4px;">
+            <input type="checkbox" id="chk-toggle-extra" style="width: auto; min-height: auto;">
+            <span>Añadir suplemento o concepto manual extraordinario</span>
           </label>
-          <label>Importe del suplemento (€)
-            <input name="pres_extra_price" id="pres_extra_price" type="number" step="0.01" min="0" placeholder="0.00">
-          </label>
+
+          <!-- Contenedor condicional para campos de suplemento -->
+          <div id="extra-fields-container" class="full grid" style="display: none; grid-template-columns: 1fr 1fr; gap: 12px; background: #f9fbf9; padding: 12px; border-radius: 8px; border: 1px dashed var(--border);">
+            <label class="full">Concepto manual / Suplemento
+              <input name="pres_extra_concept" id="pres_extra_concept" maxlength="150" placeholder="Ej. Materiales adicionales o trabajo extra">
+            </label>
+            <label class="full">Importe del suplemento (€)
+              <input name="pres_extra_price" id="pres_extra_price" type="number" step="0.01" min="0" placeholder="0.00">
+            </label>
+          </div>
 
           <label class="full">Notas / Observaciones
             <textarea name="pres_notes" rows="3" maxlength="1000"></textarea>
