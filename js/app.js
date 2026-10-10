@@ -79,23 +79,24 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Dinámica de Categoría, Subtipos de Servicios, Unidades (m²) y Checks de Tareas
+  // Dinámica de Categoría, Servicios y Unidades (m², hora, visita...)
   const categorySelect = $('#pres_category');
   const subserviceContainer = $('#subservice-container');
   const subserviceSelect = $('#pres_subservice');
   const packageDetails = $('#package-details');
-  const packageItemsList = $('#package-items-list');
-  const sqmContainer = $('#sqm-container');
-  const sqmInput = $('#pres_sqm');
+  const packageDescription = $('#package-description');
+  const qtyContainer = $('#qty-container');
+  const qtyLabelText = $('#qty-label-text');
+  const qtyInput = $('#pres_qty');
 
   if (categorySelect && subserviceSelect) {
     categorySelect.addEventListener('change', async () => {
       const cat = categorySelect.value;
-      subserviceSelect.innerHTML = '<option value="">Selecciona tipología...</option>';
+      subserviceSelect.innerHTML = '<option value="">Selecciona servicio...</option>';
       packageDetails.style.display = 'none';
-      packageItemsList.innerHTML = '';
-      if (sqmContainer) sqmContainer.style.display = 'none';
-      if (sqmInput) sqmInput.value = '';
+      packageDescription.textContent = '';
+      if (qtyContainer) qtyContainer.style.display = 'none';
+      if (qtyInput) qtyInput.value = '1';
 
       if (!cat) {
         subserviceContainer.style.display = 'none';
@@ -106,7 +107,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (matching.length > 0) {
         subserviceContainer.style.display = 'grid';
         subserviceSelect.innerHTML += matching.map(s => 
-          `<option value="${esc(s.name)}" data-desc="${esc(s.description || '')}" data-price="${s.price || 0}" data-unit="${esc(s.unit)}">${esc(s.name)} ${s.price !== null ? '(' + Number(s.price).toFixed(2) + ' €/' + esc(s.unit) + ')' : ''}</option>`
+          `<option value="${esc(s.name)}" data-id="${s.id}" data-desc="${esc(s.description || '')}" data-price="${s.price || 0}" data-unit="${esc(s.unit)}">${esc(s.name)} (${Number(s.price).toFixed(2)} € / ${esc(s.unit)})</option>`
         ).join('');
       } else {
         subserviceContainer.style.display = 'none';
@@ -118,25 +119,26 @@ document.addEventListener('DOMContentLoaded', () => {
       const desc = selectedOpt ? selectedOpt.dataset.desc : '';
       const unit = selectedOpt ? selectedOpt.dataset.unit : '';
 
-      if (unit === 'm²') {
-        if (sqmContainer) sqmContainer.style.display = 'grid';
+      // Mostrar campo dinámico de cantidad según la unidad
+      if (unit && unit !== 'servicio' && unit !== 'mes') {
+        if (qtyContainer) qtyContainer.style.display = 'grid';
+        if (qtyLabelText) {
+          if (unit === 'm²') qtyLabelText.textContent = 'Metros cuadrados (m²)';
+          else if (unit === 'hora') qtyLabelText.textContent = 'Número de horas';
+          else if (unit === 'visita') qtyLabelText.textContent = 'Número de visitas';
+          else qtyLabelText.textContent = 'Cantidad';
+        }
       } else {
-        if (sqmContainer) sqmContainer.style.display = 'none';
-        if (sqmInput) sqmInput.value = '';
+        if (qtyContainer) qtyContainer.style.display = 'none';
+        if (qtyInput) qtyInput.value = '1';
       }
 
       if (desc && selectedOpt.value) {
-        const items = desc.split(',').map(item => item.trim()).filter(Boolean);
-        packageItemsList.innerHTML = items.map((item, idx) => `
-          <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; margin: 0; cursor: pointer;">
-            <input type="checkbox" class="pkg-item-chk" value="${esc(item)}" checked style="width: auto; min-height: auto;">
-            <span>${esc(item)}</span>
-          </label>
-        `).join('');
         packageDetails.style.display = 'block';
+        packageDescription.textContent = desc;
       } else {
         packageDetails.style.display = 'none';
-        packageItemsList.innerHTML = '';
+        packageDescription.textContent = '';
       }
     });
   }
@@ -151,9 +153,8 @@ document.addEventListener('DOMContentLoaded', () => {
       delete $('#pres_client_code').dataset.id;
       if (extraContainer) extraContainer.style.display = 'none';
       if (subserviceContainer) subserviceContainer.style.display = 'none';
-      if (sqmContainer) sqmContainer.style.display = 'none';
+      if (qtyContainer) qtyContainer.style.display = 'none';
       if (packageDetails) packageDetails.style.display = 'none';
-      if (packageItemsList) packageItemsList.innerHTML = '';
       $('#pres-result-info').textContent = '';
       toast('Formulario de presupuesto restablecido');
     });
@@ -393,24 +394,19 @@ $('#f-presupuesto').addEventListener('submit', async (e) => {
     const matchedService = servicesListCache.find(s => s.category === category && s.name === subservice);
     const baseUnitPrice = matchedService && matchedService.price ? parseFloat(matchedService.price) : 0;
     const unit = matchedService ? matchedService.unit : 'servicio';
-
-    // Capturar únicamente los ítems marcados por el usuario
-    const selectedPkgItems = Array.from(document.querySelectorAll('.pkg-item-chk:checked')).map(chk => chk.value);
-    const activeTasksDesc = selectedPkgItems.length > 0 ? selectedPkgItems.join(', ') : '';
+    const serviceDesc = matchedService && matchedService.description ? matchedService.description : '';
 
     let quantity = 1;
-    let finalServicePrice = baseUnitPrice;
-
-    if (unit === 'm²') {
-      quantity = parseFloat(f.elements['pres_sqm'].value) || 1;
-      finalServicePrice = baseUnitPrice * quantity;
+    if (unit && unit !== 'servicio' && unit !== 'mes') {
+      quantity = parseFloat(f.elements['pres_qty'].value) || 1;
     }
 
+    const finalServicePrice = baseUnitPrice * quantity;
     const totalSubtotal = finalServicePrice + extraPrice;
 
     let fullNotes = `Servicio: ${category} — ${subservice} (${quantity} ${unit})`;
-    if (activeTasksDesc) {
-      fullNotes += ` [Tareas incluidas: ${activeTasksDesc}]`;
+    if (serviceDesc) {
+      fullNotes += ` [Descripción: ${serviceDesc}]`;
     }
     if (isExtraActive && extraConcept) {
       fullNotes += ` | Suplemento extra: ${extraConcept} (${extraPrice.toFixed(2)} €)`;
@@ -437,7 +433,7 @@ $('#f-presupuesto').addEventListener('submit', async (e) => {
       await db.from('quote_lines').insert({
         quote_id: quoteData.id,
         service_name: `${category}: ${subservice}`,
-        description: activeTasksDesc,
+        description: serviceDesc,
         unit: unit,
         qty: quantity,
         unit_price: baseUnitPrice,
@@ -465,9 +461,8 @@ $('#f-presupuesto').addEventListener('submit', async (e) => {
     delete $('#pres_client_code').dataset.id;
     if ($('#extra-fields-container')) $('#extra-fields-container').style.display = 'none';
     if ($('#subservice-container')) $('#subservice-container').style.display = 'none';
-    if ($('#sqm-container')) $('#sqm-container').style.display = 'none';
+    if ($('#qty-container')) $('#qty-container').style.display = 'none';
     if ($('#package-details')) $('#package-details').style.display = 'none';
-    if ($('#package-items-list')) $('#package-items-list').innerHTML = '';
   } finally {
     btn.disabled = false;
   }
