@@ -39,18 +39,27 @@
       <button id="b-logout" class="link light" type="button">Salir</button>
     </header>
 
-    <!-- SECCIÓN DE PRESUPUESTOS -->
+    <!-- SECCIÓN DE PRESUPUESTOS (Formulario de cálculo rápido) -->
     <section id="sec-presupuestos" class="wrap tab-section">
-      <div class="bar">
-        <input id="search-presupuestos" type="search" placeholder="Buscar presupuestos..." aria-label="Buscar presupuesto">
-        <button id="b-new-presupuesto" class="btn" type="button">Nuevo presupuesto</button>
-      </div>
-      <div class="card tablebox">
-        <table>
-          <thead><tr><th>Código</th><th>Cliente</th><th>Fecha</th><th>Total</th><th>Estado</th></tr></thead>
-          <tbody id="rows-presupuestos"></tbody>
-        </table>
-        <p id="empty-presupuestos" class="muted pad" hidden>Aún no hay presupuestos.</p>
+      <div class="card narrow" style="max-width: 700px; margin: 20px auto;">
+        <h2>Nuevo Presupuesto Rápido</h2>
+        <form id="f-presupuesto" class="grid">
+          <label class="full">Nombre o Empresa *<input name="pres_name" required maxlength="120"></label>
+          <label>Teléfono *<input name="pres_phone" type="tel" required maxlength="25"></label>
+          <label>Correo<input name="pres_email" type="email" maxlength="120"></label>
+          <label class="full">Servicio *
+            <select name="pres_service" required>
+              <option value="">Selecciona un servicio...</option>
+              <option value="reforma">Reforma general</option>
+              <option value="mantenimiento">Mantenimiento</option>
+              <option value="instalacion">Instalación específica</option>
+            </select>
+          </label>
+          <label class="full">Notas / Observaciones<textarea name="pres_notes" rows="3" maxlength="1000"></textarea></label>
+          <div class="actions full">
+            <button class="btn" type="submit">Calcular y Generar Presupuesto</button>
+          </div>
+        </form>
       </div>
     </section>
 
@@ -58,11 +67,19 @@
     <section id="sec-clientes" class="wrap tab-section" hidden>
       <div class="bar">
         <input id="search" type="search" placeholder="Buscar por nombre, teléfono, correo o localidad" aria-label="Buscar cliente">
-        <button id="b-new" class="btn" type="button">Nuevo cliente</button>
+        <div>
+          <button id="b-delete-selected" class="btn ghost red" type="button" hidden style="margin-right: 10px;">Eliminar seleccionados</button>
+          <button id="b-new" class="btn" type="button">Nuevo cliente</button>
+        </div>
       </div>
       <div class="card tablebox">
         <table>
-          <thead><tr><th>Código</th><th>Nombre</th><th>Teléfono</th><th>Localidad</th><th>Tipo</th></tr></thead>
+          <thead>
+            <tr>
+              <th style="width: 40px;"><input type="checkbox" id="select-all" aria-label="Seleccionar todos"></th>
+              <th>Código</th><th>Nombre</th><th>Teléfono</th><th>Localidad</th><th>Tipo</th>
+            </tr>
+          </thead>
           <tbody id="rows"></tbody>
         </table>
         <p id="empty" class="muted pad" hidden></p>
