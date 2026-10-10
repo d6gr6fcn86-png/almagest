@@ -150,9 +150,20 @@
                 </table>
               </div>
 
-              <div class="preview-total">
-                <span>Total Estimado:</span>
-                <span id="preview-grand-total">0.00 €</span>
+              <!-- Desglose de Totales con IVA -->
+              <div class="preview-summary-box">
+                <div class="summary-line">
+                  <span>Base Imponible:</span>
+                  <span id="preview-subtotal">0.00 €</span>
+                </div>
+                <div class="summary-line">
+                  <span>IVA (21%):</span>
+                  <span id="preview-tax">0.00 €</span>
+                </div>
+                <div class="summary-line total">
+                  <span>Total Presupuesto:</span>
+                  <span id="preview-grand-total">0.00 €</span>
+                </div>
               </div>
 
               <div class="actions full" style="margin-top: 15px;">
@@ -351,10 +362,19 @@
           </tbody>
         </table>
 
+        <!-- Desglose de Totales PDF -->
         <div style="display: flex; justify-content: flex-end; margin-top: 15px;">
-          <div style="width: 220px; font-size: 14px;">
-            <div style="display: flex; justify-content: space-between; padding: 6px 0; border-top: 2px solid #164B38; font-weight: bold; color: #164B38;">
-              <span>Total Presupuesto:</span>
+          <div style="width: 240px; font-size: 13px;">
+            <div style="display: flex; justify-content: space-between; padding: 4px 0; color: #4A6A5A;">
+              <span>Base Imponible:</span>
+              <span id="pdf-q-subtotal">0.00 €</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; padding: 4px 0; color: #4A6A5A;">
+              <span>IVA (21%):</span>
+              <span id="pdf-q-tax">0.00 €</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; padding: 6px 0; border-top: 2px solid #164B38; font-weight: bold; color: #164B38; font-size: 15px; margin-top: 4px;">
+              <span>TOTAL PRESUPUESTO:</span>
               <span id="pdf-q-total">0.00 €</span>
             </div>
           </div>
