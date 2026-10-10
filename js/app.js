@@ -33,19 +33,23 @@ async function cacheServices() {
 
 function renderQuotePreview() {
   const tbody = $('#preview-rows');
+  const subtotalEl = $('#preview-subtotal');
+  const taxEl = $('#preview-tax');
   const grandTotalEl = $('#preview-grand-total');
   if (!tbody) return;
 
   if (currentQuoteLines.length === 0) {
     tbody.innerHTML = `<tr><td colspan="5" class="muted" style="text-align: center; padding: 20px;">Ningún servicio añadido todavía.</td></tr>`;
+    subtotalEl.textContent = '0.00 €';
+    taxEl.textContent = '0.00 €';
     grandTotalEl.textContent = '0.00 €';
     return;
   }
 
-  let totalSum = 0;
+  let subtotalSum = 0;
   tbody.innerHTML = currentQuoteLines.map((line, idx) => {
     const lineTotal = line.unit_price * line.qty;
-    totalSum += lineTotal;
+    subtotalSum += lineTotal;
     return `
       <tr>
         <td><strong>${esc(line.service_name)}</strong><br><small class="muted">${line.qty} ${esc(line.unit)}</small></td>
@@ -57,7 +61,12 @@ function renderQuotePreview() {
     `;
   }).join('');
 
-  grandTotalEl.textContent = Number(totalSum).toFixed(2) + ' €';
+  const taxAmount = subtotalSum * 0.21;
+  const grandTotal = subtotalSum + taxAmount;
+
+  subtotalEl.textContent = Number(subtotalSum).toFixed(2) + ' €';
+  taxEl.textContent = Number(taxAmount).toFixed(2) + ' €';
+  grandTotalEl.textContent = Number(grandTotal).toFixed(2) + ' €';
 }
 
 window.removeQuoteLine = (idx) => {
@@ -71,6 +80,7 @@ let activeModalClientPhone = '';
 let activeModalClientName = '';
 let activeModalClientEmail = '';
 let activeModalQuoteCode = '';
+let activeModalSubtotal = 0;
 let activeModalTotal = 0;
 
 async function loadHistory() {
@@ -128,7 +138,10 @@ window.openQuotePreview = async (quoteId) => {
   activeModalClientName = quote.clients?.name || 'Cliente';
   activeModalClientEmail = quote.clients?.email || '';
   activeModalQuoteCode = quoteCode(quote.quote_no);
+  
+  activeModalSubtotal = parseFloat(quote.subtotal) || 0;
   activeModalTotal = parseFloat(quote.total) || 0;
+  const taxAmount = activeModalTotal - activeModalSubtotal;
 
   $('#preview-modal-title').textContent = `Presupuesto ${activeModalQuoteCode}`;
   $('#quote-status-select').value = quote.status || 'borrador';
@@ -149,7 +162,10 @@ window.openQuotePreview = async (quoteId) => {
     </tr>
   `).join('');
 
-  $('#pdf-q-total').textContent = Number(quote.total).toFixed(2) + ' €';
+  $('#pdf-q-subtotal').textContent = Number(activeModalSubtotal).toFixed(2) + ' €';
+  $('#pdf-q-tax').textContent = Number(taxAmount).toFixed(2) + ' €';
+  $('#pdf-q-total').textContent = Number(activeModalTotal).toFixed(2) + ' €';
+
   $('#dlg-quote-preview').showModal();
 };
 
@@ -192,7 +208,7 @@ if (btnSendWhatsapp) {
     }
     const cleanPhone = digits(activeModalClientPhone);
     const mensaje = encodeURIComponent(
-      `Hola ${activeModalClientName}, le enviamos el presupuesto ${activeModalQuoteCode} de AlmaGest por un importe total de ${activeModalTotal.toFixed(2)} €.\n\nAtentamente,\nAlmaGest · Aller, Asturias\nTel: +34 660 867 462`
+      `Hola ${activeModalClientName}, le enviamos el presupuesto ${activeModalQuoteCode} de AlmaGest por un importe total de ${activeModalTotal.toFixed(2)} € (IVA incl.).\n\nAtentamente,\nAlmaGest · Aller, Asturias\nTel: +34 660 867 462`
     );
     window.open(`https://api.whatsapp.com/send?phone=34${cleanPhone}&text=${mensaje}`, '_blank');
 
@@ -205,14 +221,14 @@ if (btnSendWhatsapp) {
   });
 }
 
-/* Botón Enviar Correo con destinatario automático */
+/* Botón Enviar Correo */
 const btnSendEmail = $('#b-send-email');
 if (btnSendEmail) {
   btnSendEmail.addEventListener('click', async () => {
     const emailRecipient = activeModalClientEmail ? encodeURIComponent(activeModalClientEmail) : '';
     const subject = encodeURIComponent(`Presupuesto ${activeModalQuoteCode} - AlmaGest`);
     const body = encodeURIComponent(
-      `Estimado/a ${activeModalClientName},\n\nLe adjuntamos los detalles del presupuesto ${activeModalQuoteCode} por un importe total de ${activeModalTotal.toFixed(2)} €.\n\nQuedamos a su entera disposición para cualquier aclaración.\n\nAtentamente,\nAlmaGest · Servicios Profesionales Integrales\nAller, Asturias\nTeléfono: +34 660 867 462\nEmail: danieldominguezdjamel2018@gmail.com`
+      `Estimado/a ${activeModalClientName},\n\nLe adjuntamos los detalles del presupuesto ${activeModalQuoteCode} por un importe total de ${activeModalTotal.toFixed(2)} € (IVA incluido).\n\nQuedamos a su entera disposición para cualquier aclaración.\n\nAtentamente,\nAlmaGest · Servicios Profesionales Integrales\nAller, Asturias\nTeléfono: +34 660 867 462\nEmail: danieldominguezdjamel2018@gmail.com`
     );
     
     window.location.href = `mailto:${emailRecipient}?subject=${subject}&body=${body}`;
@@ -441,7 +457,9 @@ document.addEventListener('DOMContentLoaded', () => {
           }
         }
 
-        let totalSubtotal = currentQuoteLines.reduce((acc, line) => acc + (line.unit_price * line.qty), 0);
+        const totalSubtotal = currentQuoteLines.reduce((acc, line) => acc + (line.unit_price * line.qty), 0);
+        const totalTax = totalSubtotal * 0.21;
+        const grandTotal = totalSubtotal + totalTax;
 
         let fullNotes = `Presupuesto con ${currentQuoteLines.length} líneas.`;
         if (notes) fullNotes += ` Notas: ${notes}`;
@@ -450,7 +468,7 @@ document.addEventListener('DOMContentLoaded', () => {
           client_id: clientId,
           status: 'borrador',
           subtotal: totalSubtotal,
-          total: totalSubtotal,
+          total: grandTotal,
           notes: fullNotes
         };
 
