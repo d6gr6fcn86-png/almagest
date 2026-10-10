@@ -180,6 +180,20 @@
         <section id="sec-historial" class="tab-section" hidden>
           <div class="bar">
             <input id="search-history" type="search" placeholder="Buscar por número de presupuesto o nombre de cliente..." aria-label="Buscar presupuesto">
+            
+            <!-- Botón / Filtro de Embudo por Estado -->
+            <div class="filter-funnel-wrapper">
+              <span class="funnel-icon">🔻</span>
+              <select id="filter-history-status" class="funnel-select" aria-label="Filtrar por estado">
+                <option value="todos">Todos los estados</option>
+                <option value="borrador">📌 Borrador (Sin enviar)</option>
+                <option value="emitido">📨 Emitido (Enviado)</option>
+                <option value="aceptado">✅ Aceptado</option>
+                <option value="rechazado">❌ Rechazado</option>
+                <option value="facturado">💶 Facturado</option>
+              </select>
+            </div>
+
             <button id="b-refresh-history" class="btn ghost" type="button">Actualizar</button>
           </div>
           <div class="card tablebox">
@@ -196,7 +210,7 @@
               </thead>
               <tbody id="rows-history"></tbody>
             </table>
-            <p id="empty-history" class="muted pad" hidden>No hay presupuestos registrados en el sistema.</p>
+            <p id="empty-history" class="muted pad" hidden>No hay presupuestos registrados en el sistema con los filtros aplicados.</p>
           </div>
         </section>
 
