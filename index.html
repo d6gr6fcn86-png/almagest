@@ -43,10 +43,11 @@
     <section id="sec-presupuestos" class="wrap tab-section">
       <div class="card narrow" style="max-width: 700px; margin: 20px auto;">
         <h2>Nuevo Presupuesto Rápido</h2>
-        <form id="f-presupuesto" class="grid">
-          <label>Teléfono *
-            <input name="pres_phone" id="pres_phone" type="tel" list="phones-list" required maxlength="25" placeholder="Escribe para buscar por teléfono...">
-            <datalist id="phones-list"></datalist>
+        <form id="f-presupuesto" class="grid" autocomplete="off">
+          <label style="position: relative;">Teléfono *
+            <input name="pres_phone" id="pres_phone" type="tel" required maxlength="25" placeholder="Escribe el teléfono para buscar...">
+            <!-- Lista flotante de sugerencias dinámicas -->
+            <div id="phone-suggestions" class="card" style="position: absolute; top: 100%; left: 0; right: 0; z-index: 10; max-height: 150px; overflow-y: auto; margin-top: 2px; padding: 0; display: none; box-shadow: 0 4px 12px rgba(0,0,0,0.1);"></div>
           </label>
           <label>Código de Cliente
             <input id="pres_client_code" type="text" readonly class="muted" placeholder="Automático" style="background: #f4f5f7;">
