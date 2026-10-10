@@ -22,8 +22,16 @@ function toast(msg, isErr = false) {
   toastTimer = setTimeout(() => (t.hidden = true), 4000);
 }
 
-/* ---------- Gestión de Pestañas y Ajustes (Servicios) ---------- */
+/* ---------- Gestión de Caché de Servicios ---------- */
+let servicesListCache = [];
+async function cacheServices() {
+  const { data } = await db.from('services').select('*').eq('active', true).order('pos');
+  if (data) servicesListCache = data;
+}
+
 document.addEventListener('DOMContentLoaded', () => {
+  cacheServices();
+
   const tabs = document.querySelectorAll('header nav .tab');
   const sections = document.querySelectorAll('.tab-section');
 
@@ -45,7 +53,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  // Botón de ajustes (rueda dentada ⚙) para abrir la tabla de servicios
   const btnSettings = $('#b-settings');
   if (btnSettings) {
     btnSettings.addEventListener('click', () => {
@@ -57,7 +64,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Alternar visibilidad de los campos de suplemento opcional
+  // Checkbox de suplemento opcional
   const chkToggleExtra = $('#chk-toggle-extra');
   const extraContainer = $('#extra-fields-container');
   if (chkToggleExtra && extraContainer) {
@@ -72,24 +79,48 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Mostrar u ocultar el subtipo según la categoría seleccionada
+  // Dinámica de Categoría y Subtipos de Servicios
   const categorySelect = $('#pres_category');
   const subserviceContainer = $('#subservice-container');
   const subserviceSelect = $('#pres_subservice');
+  const packageDetails = $('#package-details');
+  const packageDescription = $('#package-description');
 
-  if (categorySelect && subserviceContainer) {
-    categorySelect.addEventListener('change', (e) => {
-      const val = e.target.value;
-      if (val === 'Segundas residencias') {
+  if (categorySelect && subserviceSelect) {
+    categorySelect.addEventListener('change', async () => {
+      const cat = categorySelect.value;
+      subserviceSelect.innerHTML = '<option value="">Selecciona tipología...</option>';
+      packageDetails.style.display = 'none';
+      packageDescription.textContent = '';
+
+      if (!cat) {
+        subserviceContainer.style.display = 'none';
+        return;
+      }
+
+      const matching = servicesListCache.filter(s => s.category === cat);
+      if (matching.length > 0) {
         subserviceContainer.style.display = 'grid';
+        subserviceSelect.innerHTML += matching.map(s => `<option value="${esc(s.name)}" data-desc="${esc(s.description || '')}" data-price="${s.price || 0}">${esc(s.name)} ${s.price !== null ? '(' + Number(s.price).toFixed(2) + ' €)' : ''}</option>`).join('');
       } else {
         subserviceContainer.style.display = 'none';
-        if (subserviceSelect) subserviceSelect.value = '';
+      }
+    });
+
+    subserviceSelect.addEventListener('change', () => {
+      const selectedOpt = subserviceSelect.options[subserviceSelect.selectedIndex];
+      const desc = selectedOpt ? selectedOpt.dataset.desc : '';
+      if (desc && selectedOpt.value) {
+        packageDetails.style.display = 'block';
+        packageDescription.textContent = desc;
+      } else {
+        packageDetails.style.display = 'none';
+        packageDescription.textContent = '';
       }
     });
   }
 
-  // Botón de limpiar / resetear formulario de presupuesto
+  // Botón limpiar formulario de presupuesto
   const btnResetPresupuesto = $('#b-reset-presupuesto');
   const formPresupuesto = $('#f-presupuesto');
   if (btnResetPresupuesto && formPresupuesto) {
@@ -99,13 +130,14 @@ document.addEventListener('DOMContentLoaded', () => {
       delete $('#pres_client_code').dataset.id;
       if (extraContainer) extraContainer.style.display = 'none';
       if (subserviceContainer) subserviceContainer.style.display = 'none';
+      if (packageDetails) packageDetails.style.display = 'none';
       $('#pres-result-info').textContent = '';
       toast('Formulario de presupuesto restablecido');
     });
   }
 });
 
-/* ---------- Sesión ---------- */
+/* ---------- Sesión y Autenticación ---------- */
 let appShown = false;
 db.auth.onAuthStateChange((event, session) => {
   if (event === 'PASSWORD_RECOVERY') { appShown = false; return show('recovery'); }
@@ -162,13 +194,6 @@ async function loadServicesTable() {
      </tr>`
   ).join('');
 }
-
-let servicesListCache = [];
-async function cacheServices() {
-  const { data } = await db.from('services').select('*');
-  if (data) servicesListCache = data;
-}
-cacheServices();
 
 const bNewService = $('#b-new-service');
 if (bNewService) {
@@ -342,7 +367,16 @@ $('#f-presupuesto').addEventListener('submit', async (e) => {
       }
     }
 
-    let fullNotes = `Servicio: ${category} ${subservice ? '(' + subservice + ')' : ''}`;
+    const matchedService = servicesListCache.find(s => s.category === category && s.name === subservice);
+    const servicePrice = matchedService && matchedService.price ? parseFloat(matchedService.price) : 0;
+    const serviceDesc = matchedService && matchedService.description ? matchedService.description : '';
+
+    const totalSubtotal = servicePrice + extraPrice;
+
+    let fullNotes = `Servicio: ${category} — ${subservice}`;
+    if (serviceDesc) {
+      fullNotes += ` [Incluye: ${serviceDesc}]`;
+    }
     if (isExtraActive && extraConcept) {
       fullNotes += ` | Suplemento extra: ${extraConcept} (${extraPrice.toFixed(2)} €)`;
     }
@@ -353,8 +387,8 @@ $('#f-presupuesto').addEventListener('submit', async (e) => {
     const newQuote = {
       client_id: clientId,
       status: 'borrador',
-      subtotal: extraPrice,
-      total: extraPrice,
+      subtotal: totalSubtotal,
+      total: totalSubtotal,
       notes: fullNotes
     };
 
@@ -362,6 +396,18 @@ $('#f-presupuesto').addEventListener('submit', async (e) => {
     if (quoteErr) {
       toast('Error al generar el presupuesto: ' + quoteErr.message, true);
       return;
+    }
+
+    if (subservice) {
+      await db.from('quote_lines').insert({
+        quote_id: quoteData.id,
+        service_name: `${category}: ${subservice}`,
+        description: serviceDesc,
+        unit: matchedService ? matchedService.unit : 'servicio',
+        qty: 1,
+        unit_price: servicePrice,
+        pos: 0
+      });
     }
 
     if (isExtraActive && extraConcept && extraPrice > 0) {
@@ -384,6 +430,7 @@ $('#f-presupuesto').addEventListener('submit', async (e) => {
     delete $('#pres_client_code').dataset.id;
     if ($('#extra-fields-container')) $('#extra-fields-container').style.display = 'none';
     if ($('#subservice-container')) $('#subservice-container').style.display = 'none';
+    if ($('#package-details')) $('#package-details').style.display = 'none';
   } finally {
     btn.disabled = false;
   }
