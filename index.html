@@ -35,18 +35,17 @@
         <button class="tab" type="button" data-target="clientes">Clientes</button>
       </nav>
       <span class="grow"></span>
-      <button class="icon" type="button" disabled title="Ajustes (próximamente)" aria-label="Ajustes">⚙</button>
+      <button id="b-settings" class="icon" type="button" title="Tabla de Servicios" aria-label="Ajustes y Servicios">⚙</button>
       <button id="b-logout" class="link light" type="button">Salir</button>
     </header>
 
     <!-- SECCIÓN DE PRESUPUESTOS -->
     <section id="sec-presupuestos" class="wrap tab-section">
       <div class="card narrow" style="max-width: 700px; margin: 20px auto;">
-        <h2>Nuevo Presupuesto</h2>
+        <h2>Nuevo Presupuesto Rápido</h2>
         <form id="f-presupuesto" class="grid" autocomplete="off">
           <label style="position: relative;">Teléfono *
             <input name="pres_phone" id="pres_phone" type="tel" required maxlength="25" placeholder="Escribe el teléfono para buscar...">
-            <!-- Lista flotante de sugerencias dinámicas -->
             <div id="phone-suggestions" class="card" style="position: absolute; top: 100%; left: 0; right: 0; z-index: 10; max-height: 150px; overflow-y: auto; margin-top: 2px; padding: 0; display: none; box-shadow: 0 4px 12px rgba(0,0,0,0.1);"></div>
           </label>
           <label>Código de Cliente
@@ -61,14 +60,31 @@
           <label>Localidad *
             <input name="pres_locality" id="pres_locality" required maxlength="80" value="No especificada">
           </label>
-          <label class="full">Servicio *
-            <select name="pres_service" required>
-              <option value="">Selecciona un servicio...</option>
-              <option value="Reforma general">Reforma general</option>
-              <option value="Mantenimiento">Mantenimiento</option>
-              <option value="Instalación específica">Instalación específica</option>
+          
+          <!-- Nuevos desplegables adaptados al catálogo -->
+          <label>Categoría de Servicio *
+            <select name="pres_category" id="pres_category" required>
+              <option value="">Selecciona categoría...</option>
+              <option value="Limpieza profesional">Limpieza profesional</option>
+              <option value="Jardinería y exteriores">Jardinería y exteriores</option>
+              <option value="Mantenimiento general">Mantenimiento general</option>
+              <option value="Gestión de llaves">Gestión de llaves</option>
+              <option value="Viviendas turísticas">Viviendas turísticas</option>
+              <option value="Segundas residencias">Segundas residencias</option>
+              <option value="Comunidades">Comunidades</option>
+              <option value="Urgencias">Urgencias</option>
             </select>
           </label>
+          <label>Plan / Subtipo específico
+            <select name="pres_subservice" id="pres_subservice">
+              <option value="">(Opcional / Ninguno)</option>
+              <option value="Plan Esencial">Plan Esencial</option>
+              <option value="Plan Confort">Plan Confort</option>
+              <option value="Plan Premium">Plan Premium</option>
+              <option value="Puntual / Por horas">Puntual / Por horas</option>
+            </select>
+          </label>
+
           <label class="full">Notas / Observaciones
             <textarea name="pres_notes" rows="3" maxlength="1000"></textarea>
           </label>
@@ -103,8 +119,32 @@
         <p id="empty" class="muted pad" hidden></p>
       </div>
     </section>
+
+    <!-- SECCIÓN / MODAL DE TABLA DE SERVICIOS -->
+    <section id="sec-services" class="wrap tab-section" hidden>
+      <div class="card tablebox" style="margin: 20px auto; max-width: 900px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+          <h2>Catálogo y Tabla de Servicios</h2>
+          <button id="b-new-service" class="btn" type="button">Nuevo Servicio</button>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Categoría</th>
+              <th>Nombre del Servicio</th>
+              <th>Unidad</th>
+              <th>Precio (€)</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="rows-services"></tbody>
+        </table>
+        <p id="empty-services" class="muted pad" hidden>No hay servicios registrados en la base de datos.</p>
+      </div>
+    </section>
   </div>
 
+  <!-- MODAL CLIENTE -->
   <dialog id="dlg">
     <form id="f-client">
       <h2 id="d-title">Nuevo cliente</h2>
@@ -124,6 +164,34 @@
         <span class="grow"></span>
         <button id="d-cancel" class="btn ghost" type="button">Cancelar</button>
         <button id="d-save" class="btn" type="submit">Guardar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- MODAL SERVICIO -->
+  <dialog id="dlg-service">
+    <form id="f-service-modal">
+      <h2 id="d-service-title">Nuevo Servicio</h2>
+      <div class="grid">
+        <label class="full">Categoría<input name="category" required maxlength="80" placeholder="Ej. Limpieza profesional"></label>
+        <label class="full">Nombre del Servicio *<input name="name" required maxlength="120" placeholder="Ej. Limpieza general y profunda"></label>
+        <label>Unidad *
+          <select name="unit" required>
+            <option value="servicio">servicio</option>
+            <option value="hora">hora</option>
+            <option value="m²">m²</option>
+            <option value="mes">mes</option>
+            <option value="visita">visita</option>
+            <option value="%">%</option>
+          </select>
+        </label>
+        <label>Precio Unitario (€) *<input name="price" type="number" step="0.01" min="0" required></label>
+        <label class="full">Descripción<textarea name="description" rows="2" maxlength="500"></textarea></label>
+      </div>
+      <p id="d-service-err" class="error" hidden></p>
+      <div class="actions">
+        <button id="d-service-cancel" class="btn ghost" type="button">Cancelar</button>
+        <button id="d-service-save" class="btn" type="submit">Guardar</button>
       </div>
     </form>
   </dialog>
