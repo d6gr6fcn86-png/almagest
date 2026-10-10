@@ -39,7 +39,6 @@
 
     <!-- LAYOUT PRINCIPAL CON BARRA LATERAL -->
     <div class="app-layout">
-      <!-- BARRA LATERAL IZQUIERDA -->
       <aside class="sidebar">
         <div class="sidebar-section">
           <span class="sidebar-title">Módulos</span>
@@ -50,15 +49,14 @@
         </div>
       </aside>
 
-      <!-- CONTENIDO PRINCIPAL DINÁMICO -->
       <div class="main-content">
-        
-        <!-- 1. SECCIÓN DE PRESUPUESTOS (Doble Panel) -->
+
+        <!-- 1. PRESUPUESTOS (doble panel) -->
         <section id="sec-presupuestos" class="tab-section">
           <h2>Generador de Presupuestos Rápidos</h2>
           <div class="quote-layout">
-            
-            <!-- Panel Izquierdo: Formulario -->
+
+            <!-- Panel izquierdo: formulario -->
             <div class="card" style="margin: 0;">
               <h3>Configurar Servicios</h3>
               <form id="f-presupuesto" class="grid" autocomplete="off" style="margin-top: 12px;">
@@ -78,21 +76,14 @@
                 <label>Localidad *
                   <input name="pres_locality" id="pres_locality" required maxlength="80" value="No especificada">
                 </label>
-                
+
                 <label class="full">Categoría de Servicio *
+                  <!-- Las categorías se cargan desde el Catálogo de Servicios -->
                   <select name="pres_category" id="pres_category">
                     <option value="">Selecciona categoría...</option>
-                    <option value="Limpieza profesional">Limpieza profesional</option>
-                    <option value="Jardinería y exteriores">Jardinería y exteriores</option>
-                    <option value="Mantenimiento general">Mantenimiento general</option>
-                    <option value="Gestión de llaves">Gestión de llaves</option>
-                    <option value="Viviendas turísticas">Viviendas turísticas</option>
-                    <option value="Segundas residencias">Segundas residencias</option>
-                    <option value="Comunidades">Comunidades</option>
-                    <option value="Urgencias">Urgencias</option>
                   </select>
                 </label>
-                
+
                 <label id="subservice-container" class="full" style="display: none;">Tipología / Subtipo específico
                   <select name="pres_subservice" id="pres_subservice">
                     <option value="">Selecciona subtipo...</option>
@@ -128,11 +119,11 @@
               </form>
             </div>
 
-            <!-- Panel Derecho: Resumen en Vivo -->
+            <!-- Panel derecho: resumen en vivo -->
             <div class="card" style="margin: 0; background: #fff; border: 2px solid var(--border);">
               <h3>Resumen del Presupuesto</h3>
               <p class="muted" style="font-size: 13px; margin-bottom: 12px;">Líneas añadidas al documento:</p>
-              
+
               <div style="min-height: 200px; max-height: 350px; overflow-y: auto;">
                 <table class="preview-table">
                   <thead>
@@ -150,7 +141,6 @@
                 </table>
               </div>
 
-              <!-- Desglose de Totales con IVA -->
               <div class="preview-summary-box">
                 <div class="summary-line">
                   <span>Base Imponible:</span>
@@ -176,12 +166,11 @@
           </div>
         </section>
 
-        <!-- 2. SECCIÓN DE HISTORIAL DE PRESUPUESTOS -->
+        <!-- 2. HISTORIAL DE PRESUPUESTOS -->
         <section id="sec-historial" class="tab-section" hidden>
           <div class="bar">
             <input id="search-history" type="search" placeholder="Buscar por número de presupuesto o nombre de cliente..." aria-label="Buscar presupuesto">
-            
-            <!-- Botón / Filtro de Embudo por Estado -->
+
             <div class="filter-funnel-wrapper">
               <span class="funnel-icon">🔻</span>
               <select id="filter-history-status" class="funnel-select" aria-label="Filtrar por estado">
@@ -214,7 +203,7 @@
           </div>
         </section>
 
-        <!-- 3. SECCIÓN DE CLIENTES -->
+        <!-- 3. CLIENTES -->
         <section id="sec-clientes" class="tab-section" hidden>
           <div class="bar">
             <input id="search" type="search" placeholder="Buscar por nombre, teléfono, correo o localidad" aria-label="Buscar cliente">
@@ -235,7 +224,7 @@
           </div>
         </section>
 
-        <!-- 4. SECCIÓN / TABLA DE SERVICIOS -->
+        <!-- 4. CATÁLOGO DE SERVICIOS -->
         <section id="sec-services" class="tab-section" hidden>
           <div class="bar">
             <h2>Catálogo y Tabla de Servicios</h2>
@@ -319,7 +308,7 @@
     </form>
   </dialog>
 
-  <!-- MODAL PREVISUALIZACIÓN Y ENVÍO DE PRESUPUESTO (PDF / WhatsApp / Email) -->
+  <!-- MODAL PREVISUALIZACIÓN Y ENVÍO (PDF / WhatsApp / correo) -->
   <dialog id="dlg-quote-preview" style="width: min(850px, 94vw);">
     <div>
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
@@ -338,68 +327,9 @@
         </div>
       </div>
 
-      <!-- Plantilla para exportar a PDF / Previsualizar -->
-      <div id="pdf-printable-area" style="background: #fff; padding: 30px; border: 1px solid var(--border); border-radius: 8px; font-family: Arial, sans-serif; color: #163D2D; margin-bottom: 16px;">
-        <div style="display: flex; justify-content: space-between; border-bottom: 2px solid #164B38; padding-bottom: 15px; margin-bottom: 20px;">
-          <div>
-            <h1 style="color: #164B38; font-size: 24px; margin: 0; font-weight: bold;">ALMAGEST</h1>
-            <p style="margin: 4px 0 2px; font-size: 12px; color: #4A6A5A; font-weight: 600;">Servicios Profesionales Integrales</p>
-            <p style="margin: 0; font-size: 11px; color: #4A6A5A; line-height: 1.3;">
-              📍 Aller, Asturias<br>
-              📞 +34 660 867 462<br>
-              ✉️ danieldominguezdjamel2018@gmail.com
-            </p>
-          </div>
-          <div style="text-align: right;">
-            <strong id="pdf-q-code" style="font-size: 18px; color: #164B38;">P-0000</strong><br>
-            <span id="pdf-q-date" style="font-size: 12px; color: #4A6A5A;">Fecha: 10/10/2026</span>
-          </div>
-        </div>
+      <!-- El contenido del presupuesto (y del PDF) lo genera app.js con los Datos de empresa -->
+      <div id="pdf-printable-area" style="background: #fff; padding: 30px; border: 1px solid var(--border); border-radius: 8px; font-family: Arial, sans-serif; color: #163D2D; margin-bottom: 16px;"></div>
 
-        <div style="margin-bottom: 20px; font-size: 13px; background: #f8fbf9; padding: 12px; border-radius: 6px; border: 1px solid #BFD3C6;">
-          <strong style="color: #164B38;">DATOS DEL CLIENTE</strong><br>
-          <span id="pdf-client-name" style="font-weight: 600;">Nombre del cliente</span><br>
-          <span id="pdf-client-phone">Teléfono</span> | <span id="pdf-client-locality">Localidad</span>
-        </div>
-
-        <table style="width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 20px;">
-          <thead>
-            <tr style="background: #E3F1E8; color: #164B38;">
-              <th style="padding: 8px; text-align: left; border-bottom: 1px solid #BFD3C6;">Concepto / Servicio</th>
-              <th style="padding: 8px; text-align: center; border-bottom: 1px solid #BFD3C6; width: 60px;">Cant.</th>
-              <th style="padding: 8px; text-align: right; border-bottom: 1px solid #BFD3C6; width: 90px;">Precio Unit.</th>
-              <th style="padding: 8px; text-align: right; border-bottom: 1px solid #BFD3C6; width: 90px;">Total</th>
-            </tr>
-          </thead>
-          <tbody id="pdf-lines-tbody">
-            <!-- Dinámico -->
-          </tbody>
-        </table>
-
-        <!-- Desglose de Totales PDF -->
-        <div style="display: flex; justify-content: flex-end; margin-top: 15px;">
-          <div style="width: 240px; font-size: 13px;">
-            <div style="display: flex; justify-content: space-between; padding: 4px 0; color: #4A6A5A;">
-              <span>Base Imponible:</span>
-              <span id="pdf-q-subtotal">0.00 €</span>
-            </div>
-            <div style="display: flex; justify-content: space-between; padding: 4px 0; color: #4A6A5A;">
-              <span>IVA (21%):</span>
-              <span id="pdf-q-tax">0.00 €</span>
-            </div>
-            <div style="display: flex; justify-content: space-between; padding: 6px 0; border-top: 2px solid #164B38; font-weight: bold; color: #164B38; font-size: 15px; margin-top: 4px;">
-              <span>TOTAL PRESUPUESTO:</span>
-              <span id="pdf-q-total">0.00 €</span>
-            </div>
-          </div>
-        </div>
-
-        <div style="margin-top: 40px; font-size: 11px; color: #4A6A5A; text-align: center; border-top: 1px solid #eee; padding-top: 10px;">
-          AlmaGest — Aller, Asturias · Tel: +34 660 867 462 · Email: danieldominguezdjamel2018@gmail.com<br>Validez del presupuesto: 30 días.
-        </div>
-      </div>
-
-      <!-- Acciones de Envío Comercial -->
       <div style="display: flex; flex-wrap: wrap; gap: 10px; justify-content: space-between; align-items: center; background: #f4f7f5; padding: 12px; border-radius: 8px;">
         <div style="display: flex; gap: 8px; flex-wrap: wrap;">
           <button id="b-download-pdf" class="btn" type="button">📥 Descargar PDF</button>
