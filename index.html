@@ -39,25 +39,42 @@
       <button id="b-logout" class="link light" type="button">Salir</button>
     </header>
 
-    <!-- SECCIÓN DE PRESUPUESTOS (Formulario de cálculo rápido) -->
+    <!-- SECCIÓN DE PRESUPUESTOS -->
     <section id="sec-presupuestos" class="wrap tab-section">
       <div class="card narrow" style="max-width: 700px; margin: 20px auto;">
         <h2>Nuevo Presupuesto Rápido</h2>
         <form id="f-presupuesto" class="grid">
-          <label class="full">Nombre o Empresa *<input name="pres_name" required maxlength="120"></label>
-          <label>Teléfono *<input name="pres_phone" type="tel" required maxlength="25"></label>
-          <label>Correo<input name="pres_email" type="email" maxlength="120"></label>
+          <label>Teléfono *
+            <input name="pres_phone" id="pres_phone" type="tel" list="phones-list" required maxlength="25" placeholder="Escribe para buscar por teléfono...">
+            <datalist id="phones-list"></datalist>
+          </label>
+          <label>Código de Cliente
+            <input id="pres_client_code" type="text" readonly class="muted" placeholder="Automático" style="background: #f4f5f7;">
+          </label>
+          <label class="full">Nombre o razón social *
+            <input name="pres_name" id="pres_name" required maxlength="120" placeholder="Nombre del cliente o empresa">
+          </label>
+          <label>Correo
+            <input name="pres_email" id="pres_email" type="email" maxlength="120">
+          </label>
+          <label>Localidad *
+            <input name="pres_locality" id="pres_locality" required maxlength="80" value="No especificada">
+          </label>
           <label class="full">Servicio *
             <select name="pres_service" required>
               <option value="">Selecciona un servicio...</option>
-              <option value="reforma">Reforma general</option>
-              <option value="mantenimiento">Mantenimiento</option>
-              <option value="instalacion">Instalación específica</option>
+              <option value="Reforma general">Reforma general</option>
+              <option value="Mantenimiento">Mantenimiento</option>
+              <option value="Instalación específica">Instalación específica</option>
             </select>
           </label>
-          <label class="full">Notas / Observaciones<textarea name="pres_notes" rows="3" maxlength="1000"></textarea></label>
+          <label class="full">Notas / Observaciones
+            <textarea name="pres_notes" rows="3" maxlength="1000"></textarea>
+          </label>
           <div class="actions full">
-            <button class="btn" type="submit">Calcular y Generar Presupuesto</button>
+            <span id="pres-result-info" class="muted" style="align-self: center;"></span>
+            <span class="grow"></span>
+            <button class="btn" type="submit" id="b-save-presupuesto">Calcular y Generar Presupuesto</button>
           </div>
         </form>
       </div>
