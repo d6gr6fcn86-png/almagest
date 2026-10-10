@@ -65,30 +65,54 @@ window.removeQuoteLine = (idx) => {
   renderQuotePreview();
 };
 
+/* ---------- Historial de Presupuestos ---------- */
+async function loadHistory() {
+  const { data, error } = await db.from('quotes').select('*, clients(name, phone)').order('created_at', { ascending: false }).limit(50);
+  if (error) return toast(error.message, true);
+
+  const emptyEl = $('#empty-history');
+  const rowsEl = $('#rows-history');
+  if (!rowsEl) return;
+
+  emptyEl.hidden = data.length > 0;
+  rowsEl.innerHTML = data.map(q => `
+    <tr>
+      <td><strong>${quoteCode(q.quote_no)}</strong></td>
+      <td>${new Date(q.created_at).toLocaleDateString('es-ES')}</td>
+      <td>${esc(q.clients?.name || 'Cliente general')}</td>
+      <td><span style="padding: 2px 8px; border-radius: 4px; font-size: 11px; background: #e3f1e8; color: var(--primary);">${esc(q.status)}</span></td>
+      <td><strong>${Number(q.total).toFixed(2)} €</strong></td>
+      <td class="muted">${esc(q.notes || '-')}</td>
+    </tr>
+  `).join('');
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   cacheServices();
 
-  const tabs = document.querySelectorAll('header nav .tab');
-  const sections = document.querySelectorAll('.tab-section');
+  // Navegación de la barra lateral
+  const navButtons = document.querySelectorAll('.sidebar .nav-btn');
+  const sections = document.querySelectorAll('.main-content .tab-section');
 
-  tabs.forEach((tab) => {
-    tab.addEventListener('click', () => {
-      if (tab.hasAttribute('disabled')) return;
-      tabs.forEach(t => t.classList.remove('on'));
-      tab.classList.add('on');
-      const target = tab.dataset.target;
-      sections.forEach(sec => { sec.hidden = sec.id !== `sec-${target}`; });
+  navButtons.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      navButtons.forEach(b => b.classList.remove('on'));
+      btn.classList.add('on');
+
+      const target = btn.dataset.target;
+      sections.forEach(sec => {
+        sec.hidden = sec.id !== `sec-${target}`;
+      });
+
       if (target === 'clientes') loadClients();
+      if (target === 'services') loadServicesTable();
+      if (target === 'historial') loadHistory();
     });
   });
 
-  const btnSettings = $('#b-settings');
-  if (btnSettings) {
-    btnSettings.addEventListener('click', () => {
-      tabs.forEach(t => t.classList.remove('on'));
-      sections.forEach(sec => { sec.hidden = sec.id !== 'sec-services'; });
-      loadServicesTable();
-    });
+  const btnRefreshHistory = $('#b-refresh-history');
+  if (btnRefreshHistory) {
+    btnRefreshHistory.addEventListener('click', loadHistory);
   }
 
   // Checkbox suplemento opcional
@@ -190,7 +214,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Botón "Añadir servicios seleccionados al presupuesto" (Pasa los checks de la izq a la derecha)
+  // Botón "Añadir servicios seleccionados al presupuesto"
   const btnAddLines = $('#b-add-lines');
   if (btnAddLines) {
     btnAddLines.addEventListener('click', () => {
@@ -283,12 +307,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
         let totalSubtotal = currentQuoteLines.reduce((acc, line) => acc + (line.unit_price * line.qty), 0);
 
-        let fullNotes = `Presupuesto generado con ${currentQuoteLines.length} líneas de servicio.`;
+        let fullNotes = `Presupuesto con ${currentQuoteLines.length} líneas.`;
         if (notes) fullNotes += ` Notas: ${notes}`;
 
         const newQuote = {
           client_id: clientId,
-          status: 'borrador',
+          status: 'emitido',
           subtotal: totalSubtotal,
           total: totalSubtotal,
           notes: fullNotes
@@ -300,7 +324,6 @@ document.addEventListener('DOMContentLoaded', () => {
           return;
         }
 
-        // Insertar líneas de presupuesto en quote_lines
         for (let i = 0; i < currentQuoteLines.length; i++) {
           const line = currentQuoteLines[i];
           await db.from('quote_lines').insert({
@@ -317,7 +340,6 @@ document.addEventListener('DOMContentLoaded', () => {
         $('#pres-result-info').textContent = `¡Emitido! ID: ${numeroPresupuesto}`;
         toast(`¡Presupuesto ${numeroPresupuesto} guardado correctamente!`);
 
-        // Limpiar estado
         formPresupuesto.reset();
         $('#pres_client_code').value = '';
         delete $('#pres_client_code').dataset.id;
