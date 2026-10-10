@@ -166,9 +166,8 @@
         <!-- 2. SECCIÓN DE HISTORIAL DE PRESUPUESTOS -->
         <section id="sec-historial" class="tab-section" hidden>
           <div class="bar">
-            <h2>Historial de Presupuestos Emitidos</h2>
-            <span class="grow"></span>
-            <button id="b-refresh-history" class="btn ghost" type="button">Actualizar listado</button>
+            <input id="search-history" type="search" placeholder="Buscar por número de presupuesto o nombre de cliente..." aria-label="Buscar presupuesto">
+            <button id="b-refresh-history" class="btn ghost" type="button">Actualizar</button>
           </div>
           <div class="card tablebox">
             <table>
@@ -179,7 +178,7 @@
                   <th>Cliente</th>
                   <th>Estado</th>
                   <th>Total (€)</th>
-                  <th>Observaciones</th>
+                  <th>Acciones</th>
                 </tr>
               </thead>
               <tbody id="rows-history"></tbody>
@@ -192,10 +191,8 @@
         <section id="sec-clientes" class="tab-section" hidden>
           <div class="bar">
             <input id="search" type="search" placeholder="Buscar por nombre, teléfono, correo o localidad" aria-label="Buscar cliente">
-            <div>
-              <button id="b-delete-selected" class="btn ghost red" type="button" hidden style="margin-right: 10px;">Eliminar seleccionados</button>
-              <button id="b-new" class="btn" type="button">Nuevo cliente</button>
-            </div>
+            <button id="b-delete-selected" class="btn ghost red" type="button" hidden>Eliminar seleccionados</button>
+            <button id="b-new" class="btn" type="button">Nuevo cliente</button>
           </div>
           <div class="card tablebox">
             <table>
@@ -216,12 +213,16 @@
           <div class="bar">
             <h2>Catálogo y Tabla de Servicios</h2>
             <span class="grow"></span>
-            <button id="b-new-service" class="btn" type="button">Nuevo Servicio</button>
+            <div>
+              <button id="b-delete-selected-services" class="btn ghost red" type="button" hidden style="margin-right: 10px;">Eliminar seleccionados</button>
+              <button id="b-new-service" class="btn" type="button">Nuevo Servicio</button>
+            </div>
           </div>
           <div class="card tablebox">
             <table>
               <thead>
                 <tr>
+                  <th style="width: 40px;"><input type="checkbox" id="select-all-services" aria-label="Seleccionar todos"></th>
                   <th>Categoría</th>
                   <th>Nombre del Servicio</th>
                   <th>Unidad</th>
@@ -289,6 +290,37 @@
         <button id="d-service-save" class="btn" type="submit">Guardar</button>
       </div>
     </form>
+  </dialog>
+
+  <!-- MODAL DETALLE / RECUPERAR PRESUPUESTO -->
+  <dialog id="dlg-quote-detail" style="width: min(700px, 94vw);">
+    <div>
+      <h2 id="modal-quote-title">Detalle del Presupuesto</h2>
+      <div id="modal-quote-client-info" class="card" style="margin-bottom: 12px; background: #f8fbf9; padding: 12px;"></div>
+      
+      <div class="tablebox" style="max-height: 250px; overflow-y: auto; margin-bottom: 12px;">
+        <table class="preview-table">
+          <thead>
+            <tr>
+              <th>Servicio</th>
+              <th>Cantidad</th>
+              <th>Precio Unit.</th>
+              <th>Total</th>
+            </tr>
+          </thead>
+          <tbody id="modal-quote-lines"></tbody>
+        </table>
+      </div>
+
+      <div class="preview-total" style="margin-bottom: 0;">
+        <span>Importe Total:</span>
+        <span id="modal-quote-total">0.00 €</span>
+      </div>
+
+      <div class="actions">
+        <button id="modal-quote-close" class="btn ghost" type="button">Cerrar</button>
+      </div>
+    </div>
   </dialog>
 
   <div id="toast" role="status" hidden></div>
