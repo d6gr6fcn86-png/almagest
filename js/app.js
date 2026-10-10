@@ -65,12 +65,18 @@ window.removeQuoteLine = (idx) => {
   renderQuotePreview();
 };
 
-/* ---------- Historial de Presupuestos (con Buscador y Modal Detalle) ---------- */
+/* ---------- Historial de Presupuestos & Modal de Previsualización PDF ---------- */
+let activeModalQuoteId = null;
+let activeModalClientPhone = '';
+let activeModalClientName = '';
+let activeModalQuoteCode = '';
+let activeModalTotal = 0;
+
 async function loadHistory() {
   const searchInput = $('#search-history');
   const qFilter = searchInput ? searchInput.value.trim().toLowerCase() : '';
 
-  const { data, error } = await db.from('quotes').select('*, clients(name, phone)').order('created_at', { ascending: false }).limit(50);
+  const { data, error } = await db.from('quotes').select('*, clients(name, phone, locality)').order('created_at', { ascending: false }).limit(50);
   if (error) return toast(error.message, true);
 
   let filtered = data || [];
@@ -95,7 +101,7 @@ async function loadHistory() {
       <td><span style="padding: 2px 8px; border-radius: 4px; font-size: 11px; background: #e3f1e8; color: var(--primary);">${esc(q.status)}</span></td>
       <td><strong>${Number(q.total).toFixed(2)} €</strong></td>
       <td>
-        <button class="btn ghost" type="button" onclick="viewQuoteDetail('${q.id}')" style="padding: 4px 10px; font-size: 12px;">Ver / Recuperar</button>
+        <button class="btn ghost" type="button" onclick="openQuotePreview('${q.id}')" style="padding: 4px 10px; font-size: 12px;">Ver / Enviar PDF</button>
       </td>
     </tr>
   `).join('');
@@ -110,41 +116,120 @@ if (searchHistoryEl) {
   });
 }
 
-window.viewQuoteDetail = async (quoteId) => {
+window.openQuotePreview = async (quoteId) => {
   const { data: quote, error } = await db.from('quotes').select('*, clients(*)').eq('id', quoteId).single();
   if (error || !quote) return toast('No se pudo cargar el presupuesto', true);
 
   const { data: lines } = await db.from('quote_lines').select('*').eq('quote_id', quoteId).order('pos');
 
-  $('#modal-quote-title').textContent = `Presupuesto ${quoteCode(quote.quote_no)}`;
-  $('#modal-quote-client-info').innerHTML = `
-    <strong>Cliente:</strong> ${esc(quote.clients?.name)} (${esc(quote.clients?.phone || 'Sin teléfono')})<br>
-    <strong>Localidad:</strong> ${esc(quote.clients?.locality || 'No especificada')} | <strong>Fecha:</strong> ${new Date(quote.created_at).toLocaleDateString('es-ES')}
-  `;
+  activeModalQuoteId = quote.id;
+  activeModalClientPhone = quote.clients?.phone || '';
+  activeModalClientName = quote.clients?.name || 'Cliente';
+  activeModalQuoteCode = quoteCode(quote.quote_no);
+  activeModalTotal = parseFloat(quote.total) || 0;
 
-  const tbody = $('#modal-quote-lines');
+  $('#preview-modal-title').textContent = `Presupuesto ${activeModalQuoteCode}`;
+  $('#quote-status-select').value = quote.status || 'borrador';
+
+  $('#pdf-q-code').textContent = activeModalQuoteCode;
+  $('#pdf-q-date').textContent = `Fecha: ${new Date(quote.created_at).toLocaleDateString('es-ES')}`;
+  $('#pdf-client-name').textContent = quote.clients?.name || 'Cliente general';
+  $('#pdf-client-phone').textContent = `Tel: ${quote.clients?.phone || '-'}`;
+  $('#pdf-client-locality').textContent = `Loc: ${quote.clients?.locality || '-'}`;
+
+  const tbody = $('#pdf-lines-tbody');
   tbody.innerHTML = (lines || []).map(l => `
     <tr>
-      <td><strong>${esc(l.service_name)}</strong>${l.description ? '<br><small class="muted">' + esc(l.description) + '</small>' : ''}</td>
-      <td>${l.qty} ${esc(l.unit)}</td>
-      <td>${Number(l.unit_price).toFixed(2)} €</td>
-      <td><strong>${Number(l.unit_price * l.qty).toFixed(2)} €</strong></td>
+      <td style="padding: 8px; border-bottom: 1px solid #E3ECE6;"><strong>${esc(l.service_name)}</strong></td>
+      <td style="padding: 8px; text-align: center; border-bottom: 1px solid #E3ECE6;">${l.qty} ${esc(l.unit)}</td>
+      <td style="padding: 8px; text-align: right; border-bottom: 1px solid #E3ECE6;">${Number(l.unit_price).toFixed(2)} €</td>
+      <td style="padding: 8px; text-align: right; border-bottom: 1px solid #E3ECE6;"><strong>${Number(l.unit_price * l.qty).toFixed(2)} €</strong></td>
     </tr>
   `).join('');
 
-  $('#modal-quote-total').textContent = Number(quote.total).toFixed(2) + ' €';
-  $('#dlg-quote-detail').showModal();
+  $('#pdf-q-total').textContent = Number(quote.total).toFixed(2) + ' €';
+  $('#dlg-quote-preview').showModal();
 };
 
-const modalQuoteClose = $('#modal-quote-close');
-if (modalQuoteClose) {
-  modalQuoteClose.addEventListener('click', () => $('#dlg-quote-detail').close());
+/* Cambio dinámico de estado en Supabase */
+const quoteStatusSelect = $('#quote-status-select');
+if (quoteStatusSelect) {
+  quoteStatusSelect.addEventListener('change', async (e) => {
+    if (!activeModalQuoteId) return;
+    const newStatus = e.target.value;
+    const { error } = await db.from('quotes').update({ status: newStatus }).eq('id', activeModalQuoteId);
+    if (error) return toast('Error al actualizar el estado', true);
+    toast(`Estado actualizado a: ${newStatus}`);
+    loadHistory();
+  });
+}
+
+/* Botón Descargar PDF */
+const btnDownloadPdf = $('#b-download-pdf');
+if (btnDownloadPdf) {
+  btnDownloadPdf.addEventListener('click', () => {
+    const element = $('#pdf-printable-area');
+    const opt = {
+      margin:       10,
+      filename:     `Presupuesto_${activeModalQuoteCode}.pdf`,
+      image:        { type: 'jpeg', quality: 0.98 },
+      html2canvas:  { scale: 2, useCORS: true },
+      jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+    };
+    html2pdf().from(element).set(opt).save();
+    toast('Descargando PDF...');
+  });
+}
+
+/* Botón Enviar WhatsApp */
+const btnSendWhatsapp = $('#b-send-whatsapp');
+if (btnSendWhatsapp) {
+  btnSendWhatsapp.addEventListener('click', async () => {
+    if (!activeModalClientPhone) {
+      return toast('El cliente no tiene un teléfono válido registrado.', true);
+    }
+    const cleanPhone = digits(activeModalClientPhone);
+    const mensaje = encodeURIComponent(
+      `Hola ${activeModalClientName}, le enviamos el presupuesto ${activeModalQuoteCode} de AlmaGest por un importe total de ${activeModalTotal.toFixed(2)} €.\n\nQuedamos a su disposición para cualquier consulta.`
+    );
+    window.open(`https://api.whatsapp.com/send?phone=34${cleanPhone}&text=${mensaje}`, '_blank');
+
+    // Cambiar estado automáticamente a emitido si estaba en borrador
+    if (activeModalQuoteId) {
+      await db.from('quotes').update({ status: 'emitido' }).eq('id', activeModalQuoteId).eq('status', 'borrador');
+      $('#quote-status-select').value = 'emitido';
+      loadHistory();
+    }
+    toast('Abriendo WhatsApp...');
+  });
+}
+
+/* Botón Enviar Correo */
+const btnSendEmail = $('#b-send-email');
+if (btnSendEmail) {
+  btnSendEmail.addEventListener('click', async () => {
+    const subject = encodeURIComponent(`Presupuesto ${activeModalQuoteCode} - AlmaGest`);
+    const body = encodeURIComponent(
+      `Estimado/a ${activeModalClientName},\n\nAdjuntamos los detalles del presupuesto ${activeModalQuoteCode} por un importe total de ${activeModalTotal.toFixed(2)} €.\n\nAtentamente,\nAlmaGest`
+    );
+    window.location.href = `mailto:?subject=${subject}&body=${body}`;
+
+    if (activeModalQuoteId) {
+      await db.from('quotes').update({ status: 'emitido' }).eq('id', activeModalQuoteId).eq('status', 'borrador');
+      $('#quote-status-select').value = 'emitido';
+      loadHistory();
+    }
+  });
+}
+
+const bClosePreview = $('#b-close-preview');
+if (bClosePreview) {
+  bClosePreview.addEventListener('click', () => $('#dlg-quote-preview').close());
 }
 
 document.addEventListener('DOMContentLoaded', () => {
   cacheServices();
 
-  // Navegación lateral
   const navButtons = document.querySelectorAll('.sidebar .nav-btn');
   const sections = document.querySelectorAll('.main-content .tab-section');
 
@@ -169,7 +254,6 @@ document.addEventListener('DOMContentLoaded', () => {
     btnRefreshHistory.addEventListener('click', loadHistory);
   }
 
-  // Checkbox suplemento opcional
   const chkToggleExtra = $('#chk-toggle-extra');
   const extraContainer = $('#extra-fields-container');
   if (chkToggleExtra && extraContainer) {
@@ -205,7 +289,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Desplegables en cascada
   const categorySelect = $('#pres_category');
   const subserviceContainer = $('#subservice-container');
   const subserviceSelect = $('#pres_subservice');
@@ -362,7 +445,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const newQuote = {
           client_id: clientId,
-          status: 'emitido',
+          status: 'borrador',
           subtotal: totalSubtotal,
           total: totalSubtotal,
           notes: fullNotes
@@ -387,8 +470,11 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         const numeroPresupuesto = quoteCode(quoteData.quote_no);
-        $('#pres-result-info').textContent = `¡Emitido! ID: ${numeroPresupuesto}`;
-        toast(`¡Presupuesto ${numeroPresupuesto} guardado correctamente!`);
+        $('#pres-result-info').textContent = `¡Generado! ID: ${numeroPresupuesto}`;
+        toast(`¡Presupuesto ${numeroPresupuesto} generado con éxito! Abriendo previsualización...`);
+
+        // Abrir inmediatamente el modal de previsualización PDF y envío
+        openQuotePreview(quoteData.id);
 
         formPresupuesto.reset();
         $('#pres_client_code').value = '';
@@ -441,7 +527,7 @@ $('#f-recovery').addEventListener('submit', async (e) => {
 });
 $('#b-logout').addEventListener('click', () => db.auth.signOut());
 
-/* ---------- Tabla de Servicios (con Borrado Individual y Masivo) ---------- */
+/* ---------- Tabla de Servicios (Catálogo) ---------- */
 async function loadServicesTable() {
   const { data, error } = await db.from('services').select('*').order('pos');
   if (error) return toast(error.message, true);
