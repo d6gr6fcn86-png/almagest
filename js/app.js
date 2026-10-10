@@ -74,7 +74,7 @@ window.removeQuoteLine = (idx) => {
   renderQuotePreview();
 };
 
-/* ---------- Historial de Presupuestos & Modal de Previsualización PDF ---------- */
+/* ---------- Historial de Presupuestos (con Filtro de Embudo por Estado) ---------- */
 let activeModalQuoteId = null;
 let activeModalClientPhone = '';
 let activeModalClientName = '';
@@ -85,9 +85,18 @@ let activeModalTotal = 0;
 
 async function loadHistory() {
   const searchInput = $('#search-history');
+  const statusFilterEl = $('#filter-history-status');
+  
   const qFilter = searchInput ? searchInput.value.trim().toLowerCase() : '';
+  const statusFilter = statusFilterEl ? statusFilterEl.value : 'todos';
 
-  const { data, error } = await db.from('quotes').select('*, clients(name, phone, email, locality)').order('created_at', { ascending: false }).limit(50);
+  let query = db.from('quotes').select('*, clients(*)').order('created_at', { ascending: false }).limit(100);
+  
+  if (statusFilter !== 'todos') {
+    query = query.eq('status', statusFilter);
+  }
+
+  const { data, error } = await query;
   if (error) return toast(error.message, true);
 
   let filtered = data || [];
@@ -104,19 +113,48 @@ async function loadHistory() {
   if (!rowsEl) return;
 
   emptyEl.hidden = filtered.length > 0;
-  rowsEl.innerHTML = filtered.map(q => `
-    <tr>
-      <td><strong>${quoteCode(q.quote_no)}</strong></td>
-      <td>${new Date(q.created_at).toLocaleDateString('es-ES')}</td>
-      <td>${esc(q.clients?.name || 'Cliente general')}</td>
-      <td><span style="padding: 2px 8px; border-radius: 4px; font-size: 11px; background: #e3f1e8; color: var(--primary);">${esc(q.status)}</span></td>
-      <td><strong>${Number(q.total).toFixed(2)} €</strong></td>
-      <td>
-        <button class="btn ghost" type="button" onclick="openQuotePreview('${q.id}')" style="padding: 4px 10px; font-size: 12px;">Ver / Enviar PDF</button>
-      </td>
-    </tr>
-  `).join('');
+  rowsEl.innerHTML = filtered.map(q => {
+    const statusBadges = {
+      borrador: 'background: #fff3cd; color: #856404;',
+      emitido: 'background: #d1ecf1; color: #0c5460;',
+      aceptado: 'background: #d4edda; color: #155724;',
+      rechazado: 'background: #f8d7da; color: #721c24;',
+      facturado: 'background: #e2e3e5; color: #383d41;'
+    };
+    const badgeStyle = statusBadges[q.status] || 'background: #e3f1e8; color: var(--primary);';
+
+    return `
+      <tr>
+        <td><strong>${quoteCode(q.quote_no)}</strong></td>
+        <td>${new Date(q.created_at).toLocaleDateString('es-ES')}</td>
+        <td>
+          <a href="#" class="link" onclick="openClientDetail('${q.client_id}'); return false;" title="Abrir ficha del cliente">
+            <strong>${esc(q.clients?.name || 'Cliente general')}</strong>
+          </a>
+        </td>
+        <td><span style="padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; ${badgeStyle}">${esc(q.status.toUpperCase())}</span></td>
+        <td><strong>${Number(q.total).toFixed(2)} €</strong></td>
+        <td>
+          <button class="btn ghost" type="button" onclick="openQuotePreview('${q.id}')" style="padding: 4px 10px; font-size: 12px;">Ver / Enviar PDF</button>
+        </td>
+      </tr>
+    `;
+  }).join('');
 }
+
+/* Función para saltar directamente a la ficha del cliente desde el historial */
+window.openClientDetail = async (clientId) => {
+  if (!clientId) return;
+  const navBtnClientes = document.querySelector('.nav-btn[data-target="clientes"]');
+  if (navBtnClientes) navBtnClientes.click();
+
+  const { data: client, error } = await db.from('clients').select('*').eq('id', clientId).single();
+  if (client) {
+    openForm(client);
+  } else {
+    toast('No se encontró la ficha completa del cliente', true);
+  }
+};
 
 let historySearchTimer;
 const searchHistoryEl = $('#search-history');
@@ -125,6 +163,11 @@ if (searchHistoryEl) {
     clearTimeout(historySearchTimer);
     historySearchTimer = setTimeout(loadHistory, 250);
   });
+}
+
+const filterStatusEl = $('#filter-history-status');
+if (filterStatusEl) {
+  filterStatusEl.addEventListener('change', loadHistory);
 }
 
 window.openQuotePreview = async (quoteId) => {
