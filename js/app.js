@@ -49,7 +49,7 @@ db.auth.onAuthStateChange((event, session) => {
   if (!appShown) {
     appShown = true;
     show('app');
-    setTimeout(loadClients, 0); // evita llamar a Supabase dentro del propio callback
+    setTimeout(loadClients, 0);
   }
 });
 
@@ -76,6 +76,13 @@ $('#f-recovery').addEventListener('submit', async (e) => {
 });
 $('#b-logout').addEventListener('click', () => db.auth.signOut());
 
+/* ---------- Formulario Presupuestos ---------- */
+$('#f-presupuesto').addEventListener('submit', (e) => {
+  e.preventDefault();
+  toast('Presupuesto generado correctamente (Simulación)');
+  e.target.reset();
+});
+
 /* ---------- Clientes ---------- */
 let clients = [];
 async function loadClients() {
@@ -87,20 +94,33 @@ async function loadClients() {
   clients = data;
   $('#empty').hidden = clients.length > 0;
   $('#empty').textContent = q ? 'Ningún cliente coincide con la búsqueda.' : 'Aún no hay clientes. Crea el primero con «Nuevo cliente».';
+  
   $('#rows').innerHTML = clients.map((c) =>
-    `<tr data-id="${esc(c.id)}" tabindex="0"><td>${code(c.code_num)}</td><td>${esc(c.name)}</td><td>${esc(c.phone)}</td><td>${esc(c.locality)}</td><td>${esc(KINDS[c.kind] || c.kind)}</td></tr>`
+    `<tr data-id="${esc(c.id)}" tabindex="0">
+       <td onclick="event.stopPropagation()"><input type="checkbox" class="row-select" value="${esc(c.id)}" aria-label="Seleccionar cliente"></td>
+       <td>${code(c.code_num)}</td>
+       <td>${esc(c.name)}</td>
+       <td>${esc(c.phone)}</td>
+       <td>${esc(c.locality)}</td>
+       <td>${esc(KINDS[c.kind] || c.kind)}</td>
+     </tr>`
   ).join('');
+
+  actualizarBotonEliminarMultiples();
 }
 
 let searchTimer;
 $('#search').addEventListener('input', () => { clearTimeout(searchTimer); searchTimer = setTimeout(loadClients, 250); });
 
+// Abrir ficha al hacer clic en la fila (excepto si se hace clic en el checkbox)
 const openFromRow = (e) => {
+  if (e.target.type === 'checkbox') return;
   const tr = e.target.closest('tr[data-id]');
   if (tr) openForm(clients.find((c) => c.id === tr.dataset.id));
 };
 $('#rows').addEventListener('click', openFromRow);
 $('#rows').addEventListener('keydown', (e) => { if (e.key === 'Enter') openFromRow(e); });
+
 $('#b-new').addEventListener('click', () => openForm(null));
 $('#d-cancel').addEventListener('click', () => $('#dlg').close());
 
@@ -114,7 +134,6 @@ function openForm(c) {
   }
   $('#d-err').hidden = true;
   
-  // Mostrar u ocultar botón de eliminar según si se está editando o creando
   const btnDelete = $('#d-delete');
   if (btnDelete) {
     btnDelete.hidden = !c;
@@ -161,7 +180,7 @@ $('#f-client').addEventListener('submit', async (e) => {
   }
 });
 
-/* ---------- Eliminar Cliente ---------- */
+/* ---------- Eliminar Cliente Individual (desde la ficha) ---------- */
 const btnDelete = $('#d-delete');
 if (btnDelete) {
   btnDelete.addEventListener('click', async () => {
@@ -177,4 +196,61 @@ if (btnDelete) {
       if (error) {
         $('#d-err').textContent = error.message;
         $('#d-err').hidden = false;
-        return
+        return;
+      }
+      $('#dlg').close();
+      toast('Cliente eliminado correctamente');
+      loadClients();
+    } finally {
+      btnDelete.disabled = false;
+    }
+  });
+}
+
+/* ---------- Selección múltiple y borrado masivo de clientes ---------- */
+function actualizarBotonEliminarMultiples() {
+  const seleccionados = document.querySelectorAll('.row-select:checked');
+  const btnMulti = $('#b-delete-selected');
+  if (btnMulti) {
+    btnMulti.hidden = seleccionados.length === 0;
+  }
+}
+
+$('#rows').addEventListener('change', (e) => {
+  if (e.target.classList.contains('row-select')) {
+    actualizarBotonEliminarMultiples();
+  }
+});
+
+const selectAllCheckbox = $('#select-all');
+if (selectAllCheckbox) {
+  selectAllCheckbox.addEventListener('change', (e) => {
+    const checkboxes = document.querySelectorAll('.row-select');
+    checkboxes.forEach(chk => chk.checked = e.target.checked);
+    actualizarBotonEliminarMultiples();
+  });
+}
+
+const btnDeleteSelected = $('#b-delete-selected');
+if (btnDeleteSelected) {
+  btnDeleteSelected.addEventListener('click', async () => {
+    const seleccionados = Array.from(document.querySelectorAll('.row-select:checked')).map(chk => chk.value);
+    if (seleccionados.length === 0) return;
+
+    if (!confirm(`¿Estás seguro de eliminar los ${seleccionados.length} clientes seleccionados?`)) return;
+
+    btnDeleteSelected.disabled = true;
+    try {
+      const { error } = await db.from('clients').delete().in('id', seleccionados);
+      if (error) {
+        toast(error.message, true);
+        return;
+      }
+      toast('Clientes seleccionados eliminados correctamente');
+      if (selectAllCheckbox) selectAllCheckbox.checked = false;
+      loadClients();
+    } finally {
+      btnDeleteSelected.disabled = false;
+    }
+  });
+}
