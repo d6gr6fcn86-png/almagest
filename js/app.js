@@ -79,12 +79,14 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Dinámica de Categoría y Subtipos de Servicios
+  // Dinámica de Categoría, Subtipos de Servicios y Unidades (m²)
   const categorySelect = $('#pres_category');
   const subserviceContainer = $('#subservice-container');
   const subserviceSelect = $('#pres_subservice');
   const packageDetails = $('#package-details');
   const packageDescription = $('#package-description');
+  const sqmContainer = $('#sqm-container');
+  const sqmInput = $('#pres_sqm');
 
   if (categorySelect && subserviceSelect) {
     categorySelect.addEventListener('change', async () => {
@@ -92,6 +94,8 @@ document.addEventListener('DOMContentLoaded', () => {
       subserviceSelect.innerHTML = '<option value="">Selecciona tipología...</option>';
       packageDetails.style.display = 'none';
       packageDescription.textContent = '';
+      if (sqmContainer) sqmContainer.style.display = 'none';
+      if (sqmInput) sqmInput.value = '';
 
       if (!cat) {
         subserviceContainer.style.display = 'none';
@@ -101,7 +105,9 @@ document.addEventListener('DOMContentLoaded', () => {
       const matching = servicesListCache.filter(s => s.category === cat);
       if (matching.length > 0) {
         subserviceContainer.style.display = 'grid';
-        subserviceSelect.innerHTML += matching.map(s => `<option value="${esc(s.name)}" data-desc="${esc(s.description || '')}" data-price="${s.price || 0}">${esc(s.name)} ${s.price !== null ? '(' + Number(s.price).toFixed(2) + ' €)' : ''}</option>`).join('');
+        subserviceSelect.innerHTML += matching.map(s => 
+          `<option value="${esc(s.name)}" data-desc="${esc(s.description || '')}" data-price="${s.price || 0}" data-unit="${esc(s.unit)}">${esc(s.name)} ${s.price !== null ? '(' + Number(s.price).toFixed(2) + ' €/' + esc(s.unit) + ')' : ''}</option>`
+        ).join('');
       } else {
         subserviceContainer.style.display = 'none';
       }
@@ -110,6 +116,15 @@ document.addEventListener('DOMContentLoaded', () => {
     subserviceSelect.addEventListener('change', () => {
       const selectedOpt = subserviceSelect.options[subserviceSelect.selectedIndex];
       const desc = selectedOpt ? selectedOpt.dataset.desc : '';
+      const unit = selectedOpt ? selectedOpt.dataset.unit : '';
+
+      if (unit === 'm²') {
+        if (sqmContainer) sqmContainer.style.display = 'grid';
+      } else {
+        if (sqmContainer) sqmContainer.style.display = 'none';
+        if (sqmInput) sqmInput.value = '';
+      }
+
       if (desc && selectedOpt.value) {
         packageDetails.style.display = 'block';
         packageDescription.textContent = desc;
@@ -130,6 +145,7 @@ document.addEventListener('DOMContentLoaded', () => {
       delete $('#pres_client_code').dataset.id;
       if (extraContainer) extraContainer.style.display = 'none';
       if (subserviceContainer) subserviceContainer.style.display = 'none';
+      if (sqmContainer) sqmContainer.style.display = 'none';
       if (packageDetails) packageDetails.style.display = 'none';
       $('#pres-result-info').textContent = '';
       toast('Formulario de presupuesto restablecido');
@@ -368,12 +384,21 @@ $('#f-presupuesto').addEventListener('submit', async (e) => {
     }
 
     const matchedService = servicesListCache.find(s => s.category === category && s.name === subservice);
-    const servicePrice = matchedService && matchedService.price ? parseFloat(matchedService.price) : 0;
+    const baseUnitPrice = matchedService && matchedService.price ? parseFloat(matchedService.price) : 0;
+    const unit = matchedService ? matchedService.unit : 'servicio';
     const serviceDesc = matchedService && matchedService.description ? matchedService.description : '';
 
-    const totalSubtotal = servicePrice + extraPrice;
+    let quantity = 1;
+    let finalServicePrice = baseUnitPrice;
 
-    let fullNotes = `Servicio: ${category} — ${subservice}`;
+    if (unit === 'm²') {
+      quantity = parseFloat(f.elements['pres_sqm'].value) || 1;
+      finalServicePrice = baseUnitPrice * quantity;
+    }
+
+    const totalSubtotal = finalServicePrice + extraPrice;
+
+    let fullNotes = `Servicio: ${category} — ${subservice} (${quantity} ${unit})`;
     if (serviceDesc) {
       fullNotes += ` [Incluye: ${serviceDesc}]`;
     }
@@ -403,9 +428,9 @@ $('#f-presupuesto').addEventListener('submit', async (e) => {
         quote_id: quoteData.id,
         service_name: `${category}: ${subservice}`,
         description: serviceDesc,
-        unit: matchedService ? matchedService.unit : 'servicio',
-        qty: 1,
-        unit_price: servicePrice,
+        unit: unit,
+        qty: quantity,
+        unit_price: baseUnitPrice,
         pos: 0
       });
     }
@@ -430,6 +455,7 @@ $('#f-presupuesto').addEventListener('submit', async (e) => {
     delete $('#pres_client_code').dataset.id;
     if ($('#extra-fields-container')) $('#extra-fields-container').style.display = 'none';
     if ($('#subservice-container')) $('#subservice-container').style.display = 'none';
+    if ($('#sqm-container')) $('#sqm-container').style.display = 'none';
     if ($('#package-details')) $('#package-details').style.display = 'none';
   } finally {
     btn.disabled = false;
