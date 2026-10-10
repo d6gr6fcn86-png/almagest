@@ -56,6 +56,21 @@ document.addEventListener('DOMContentLoaded', () => {
       loadServicesTable();
     });
   }
+
+  // Alternar visibilidad de los campos de suplemento opcional
+  const chkToggleExtra = $('#chk-toggle-extra');
+  const extraContainer = $('#extra-fields-container');
+  if (chkToggleExtra && extraContainer) {
+    chkToggleExtra.addEventListener('change', (e) => {
+      if (e.target.checked) {
+        extraContainer.style.display = 'grid';
+      } else {
+        extraContainer.style.display = 'none';
+        $('#pres_extra_concept').value = '';
+        $('#pres_extra_price').value = '';
+      }
+    });
+  }
 });
 
 /* ---------- Sesión ---------- */
@@ -259,8 +274,11 @@ $('#f-presupuesto').addEventListener('submit', async (e) => {
     const locality = f.elements['pres_locality'].value.trim() || 'No especificada';
     const category = f.elements['pres_category'].value;
     const subservice = f.elements['pres_subservice'].value;
-    const extraConcept = f.elements['pres_extra_concept'].value.trim();
-    const extraPrice = parseFloat(f.elements['pres_extra_price'].value) || 0;
+    
+    const isExtraActive = $('#chk-toggle-extra').checked;
+    const extraConcept = isExtraActive ? f.elements['pres_extra_concept'].value.trim() : '';
+    const extraPrice = isExtraActive ? (parseFloat(f.elements['pres_extra_price'].value) || 0) : 0;
+    
     const notes = f.elements['pres_notes'].value.trim() || null;
 
     if (digits(phone).length < 9) {
@@ -292,9 +310,8 @@ $('#f-presupuesto').addEventListener('submit', async (e) => {
       }
     }
 
-    // Construir la descripción y total incluyendo el suplemento si existe
     let fullNotes = `Servicio: ${category} ${subservice ? '(' + subservice + ')' : ''}`;
-    if (extraConcept) {
+    if (isExtraActive && extraConcept) {
       fullNotes += ` | Suplemento extra: ${extraConcept} (${extraPrice.toFixed(2)} €)`;
     }
     if (notes) {
@@ -315,8 +332,7 @@ $('#f-presupuesto').addEventListener('submit', async (e) => {
       return;
     }
 
-    // Si hay suplemento o concepto extra, lo añadimos opcionalmente como línea de presupuesto
-    if (extraConcept && extraPrice > 0) {
+    if (isExtraActive && extraConcept && extraPrice > 0) {
       await db.from('quote_lines').insert({
         quote_id: quoteData.id,
         service_name: extraConcept,
@@ -334,6 +350,7 @@ $('#f-presupuesto').addEventListener('submit', async (e) => {
     f.reset();
     $('#pres_client_code').value = '';
     delete $('#pres_client_code').dataset.id;
+    if ($('#extra-fields-container')) $('#extra-fields-container').style.display = 'none';
   } finally {
     btn.disabled = false;
   }
