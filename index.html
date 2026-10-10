@@ -61,7 +61,7 @@
             <input name="pres_locality" id="pres_locality" required maxlength="80" value="No especificada">
           </label>
           
-          <!-- Nuevos desplegables adaptados al catálogo -->
+          <!-- Desplegables de servicios adaptados al catálogo -->
           <label>Categoría de Servicio *
             <select name="pres_category" id="pres_category" required>
               <option value="">Selecciona categoría...</option>
@@ -83,6 +83,14 @@
               <option value="Plan Premium">Plan Premium</option>
               <option value="Puntual / Por horas">Puntual / Por horas</option>
             </select>
+          </label>
+
+          <!-- NUEVOS CAMPOS: Concepto manual / Suplemento extraordinario -->
+          <label class="full">Concepto manual / Suplemento extraordinario (opcional)
+            <input name="pres_extra_concept" id="pres_extra_concept" maxlength="150" placeholder="Ej. Materiales adicionales o trabajo extra específico">
+          </label>
+          <label>Importe del suplemento (€)
+            <input name="pres_extra_price" id="pres_extra_price" type="number" step="0.01" min="0" placeholder="0.00">
           </label>
 
           <label class="full">Notas / Observaciones
@@ -120,7 +128,7 @@
       </div>
     </section>
 
-<!-- SECCIÓN / TABLA DE SERVICIOS -->
+    <!-- SECCIÓN / TABLA DE SERVICIOS -->
     <section id="sec-services" class="wrap tab-section" hidden>
       <div class="bar">
         <h2>Catálogo y Tabla de Servicios</h2>
@@ -143,6 +151,7 @@
         <p id="empty-services" class="muted pad" hidden>No hay servicios registrados en la base de datos.</p>
       </div>
     </section>
+  </div>
 
   <!-- MODAL CLIENTE -->
   <dialog id="dlg">
