@@ -69,6 +69,7 @@ window.removeQuoteLine = (idx) => {
 let activeModalQuoteId = null;
 let activeModalClientPhone = '';
 let activeModalClientName = '';
+let activeModalClientEmail = '';
 let activeModalQuoteCode = '';
 let activeModalTotal = 0;
 
@@ -76,7 +77,7 @@ async function loadHistory() {
   const searchInput = $('#search-history');
   const qFilter = searchInput ? searchInput.value.trim().toLowerCase() : '';
 
-  const { data, error } = await db.from('quotes').select('*, clients(name, phone, locality)').order('created_at', { ascending: false }).limit(50);
+  const { data, error } = await db.from('quotes').select('*, clients(name, phone, email, locality)').order('created_at', { ascending: false }).limit(50);
   if (error) return toast(error.message, true);
 
   let filtered = data || [];
@@ -125,6 +126,7 @@ window.openQuotePreview = async (quoteId) => {
   activeModalQuoteId = quote.id;
   activeModalClientPhone = quote.clients?.phone || '';
   activeModalClientName = quote.clients?.name || 'Cliente';
+  activeModalClientEmail = quote.clients?.email || '';
   activeModalQuoteCode = quoteCode(quote.quote_no);
   activeModalTotal = parseFloat(quote.total) || 0;
 
@@ -194,7 +196,6 @@ if (btnSendWhatsapp) {
     );
     window.open(`https://api.whatsapp.com/send?phone=34${cleanPhone}&text=${mensaje}`, '_blank');
 
-    // Cambiar estado automáticamente a emitido si estaba en borrador
     if (activeModalQuoteId) {
       await db.from('quotes').update({ status: 'emitido' }).eq('id', activeModalQuoteId).eq('status', 'borrador');
       $('#quote-status-select').value = 'emitido';
@@ -204,15 +205,17 @@ if (btnSendWhatsapp) {
   });
 }
 
-/* Botón Enviar Correo */
+/* Botón Enviar Correo con destinatario automático */
 const btnSendEmail = $('#b-send-email');
 if (btnSendEmail) {
   btnSendEmail.addEventListener('click', async () => {
+    const emailRecipient = activeModalClientEmail ? encodeURIComponent(activeModalClientEmail) : '';
     const subject = encodeURIComponent(`Presupuesto ${activeModalQuoteCode} - AlmaGest`);
     const body = encodeURIComponent(
       `Estimado/a ${activeModalClientName},\n\nAdjuntamos los detalles del presupuesto ${activeModalQuoteCode} por un importe total de ${activeModalTotal.toFixed(2)} €.\n\nAtentamente,\nAlmaGest`
     );
-    window.location.href = `mailto:?subject=${subject}&body=${body}`;
+    
+    window.location.href = `mailto:${emailRecipient}?subject=${subject}&body=${body}`;
 
     if (activeModalQuoteId) {
       await db.from('quotes').update({ status: 'emitido' }).eq('id', activeModalQuoteId).eq('status', 'borrador');
@@ -473,7 +476,6 @@ document.addEventListener('DOMContentLoaded', () => {
         $('#pres-result-info').textContent = `¡Generado! ID: ${numeroPresupuesto}`;
         toast(`¡Presupuesto ${numeroPresupuesto} generado con éxito! Abriendo previsualización...`);
 
-        // Abrir inmediatamente el modal de previsualización PDF y envío
         openQuotePreview(quoteData.id);
 
         formPresupuesto.reset();
