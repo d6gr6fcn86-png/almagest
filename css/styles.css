@@ -244,16 +244,28 @@ tbody tr:hover, tbody tr:focus {
   font-size: 11px;
   color: var(--muted);
 }
-.preview-total {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: 16px;
-  font-weight: bold;
-  margin: 15px 0;
+
+.preview-summary-box {
+  margin-top: 15px;
   padding-top: 12px;
   border-top: 2px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.summary-line {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  color: var(--muted);
+}
+.summary-line.total {
+  font-size: 16px;
+  font-weight: bold;
   color: var(--brand);
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
+  margin-top: 4px;
 }
 
 dialog {
