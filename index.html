@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>AlmaGest</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <main id="v-login" class="center" hidden>
+    <form id="f-login" class="card narrow">
+      <h1>AlmaGest</h1>
+      <p class="muted">Acceso privado</p>
+      <label>Correo<input id="l-email" type="email" autocomplete="username" required></label>
+      <label>Contraseña<input id="l-pass" type="password" autocomplete="current-password" required></label>
+      <button class="btn" type="submit">Entrar</button>
+      <button id="b-reset" class="link" type="button">He olvidado mi contraseña</button>
+    </form>
+  </main>
+
+  <main id="v-recovery" class="center" hidden>
+    <form id="f-recovery" class="card narrow">
+      <h1>Nueva contraseña</h1>
+      <label>Contraseña nueva (mínimo 8 caracteres)<input id="r-pass" type="password" autocomplete="new-password" minlength="8" required></label>
+      <button class="btn" type="submit">Guardar</button>
+    </form>
+  </main>
+
+  <div id="v-app" hidden>
+    <header class="top">
+      <strong>AlmaGest</strong>
+      <nav>
+        <button class="tab on" type="button">Clientes</button>
+        <button class="tab" type="button" disabled title="Próximamente">Presupuestos</button>
+      </nav>
+      <span class="grow"></span>
+      <button class="icon" type="button" disabled title="Ajustes (próximamente)" aria-label="Ajustes">⚙</button>
+      <button id="b-logout" class="link light" type="button">Salir</button>
+    </header>
+    <section class="wrap">
+      <div class="bar">
+        <input id="search" type="search" placeholder="Buscar por nombre, teléfono, correo o localidad" aria-label="Buscar cliente">
+        <button id="b-new" class="btn" type="button">Nuevo cliente</button>
+      </div>
+      <div class="card tablebox">
+        <table>
+          <thead><tr><th>Código</th><th>Nombre</th><th>Teléfono</th><th>Localidad</th><th>Tipo</th></tr></thead>
+          <tbody id="rows"></tbody>
+        </table>
+        <p id="empty" class="muted pad" hidden></p>
+      </div>
+    </section>
+  </div>
+
+  <dialog id="dlg">
+    <form id="f-client">
+      <h2 id="d-title">Nuevo cliente</h2>
+      <div class="grid">
+        <label class="full">Nombre o razón social *<input name="name" required maxlength="120"></label>
+        <label>Teléfono *<input name="phone" type="tel" required maxlength="25"></label>
+        <label>Correo<input name="email" type="email" maxlength="120"></label>
+        <label>Localidad *<input name="locality" required maxlength="80"></label>
+        <label>Tipo<select name="kind"><option value="particular">Particular</option><option value="empresa">Empresa</option><option value="comunidad">Comunidad</option></select></label>
+        <label class="full">Dirección<input name="address" maxlength="160"></label>
+        <label>NIF/CIF (opcional)<input name="nif" maxlength="20"></label>
+        <label class="full">Notas<textarea name="notes" rows="3" maxlength="1000"></textarea></label>
+      </div>
+      <p id="d-err" class="error" hidden></p>
+      <div class="actions">
+        <button id="d-cancel" class="btn ghost" type="button">Cancelar</button>
+        <button id="d-save" class="btn" type="submit">Guardar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div id="toast" role="status" hidden></div>
+
+  <!-- Comprueba en https://www.npmjs.com/package/@supabase/supabase-js la última versión 2.x con más de dos semanas -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.109.0"></script>
+  <script src="js/config.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
