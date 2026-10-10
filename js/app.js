@@ -22,12 +22,48 @@ function toast(msg, isErr = false) {
   toastTimer = setTimeout(() => (t.hidden = true), 4000);
 }
 
-/* ---------- Caché de Servicios ---------- */
+/* ---------- Caché de Servicios y Estado del Presupuesto ---------- */
 let servicesListCache = [];
+let currentQuoteLines = [];
+
 async function cacheServices() {
   const { data } = await db.from('services').select('*').eq('active', true).order('pos');
   if (data) servicesListCache = data;
 }
+
+function renderQuotePreview() {
+  const tbody = $('#preview-rows');
+  const grandTotalEl = $('#preview-grand-total');
+  if (!tbody) return;
+
+  if (currentQuoteLines.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="5" class="muted" style="text-align: center; padding: 20px;">Ningún servicio añadido todavía.</td></tr>`;
+    grandTotalEl.textContent = '0.00 €';
+    return;
+  }
+
+  let totalSum = 0;
+  tbody.innerHTML = currentQuoteLines.map((line, idx) => {
+    const lineTotal = line.unit_price * line.qty;
+    totalSum += lineTotal;
+    return `
+      <tr>
+        <td><strong>${esc(line.service_name)}</strong><br><small class="muted">${line.qty} ${esc(line.unit)}</small></td>
+        <td>${line.qty}</td>
+        <td>${Number(line.unit_price).toFixed(2)} €</td>
+        <td><strong>${Number(lineTotal).toFixed(2)} €</strong></td>
+        <td><button type="button" class="btn ghost red" style="padding: 2px 6px; font-size: 11px;" onclick="removeQuoteLine(${idx})">×</button></td>
+      </tr>
+    `;
+  }).join('');
+
+  grandTotalEl.textContent = Number(totalSum).toFixed(2) + ' €';
+}
+
+window.removeQuoteLine = (idx) => {
+  currentQuoteLines.splice(idx, 1);
+  renderQuotePreview();
+};
 
 document.addEventListener('DOMContentLoaded', () => {
   cacheServices();
@@ -38,18 +74,11 @@ document.addEventListener('DOMContentLoaded', () => {
   tabs.forEach((tab) => {
     tab.addEventListener('click', () => {
       if (tab.hasAttribute('disabled')) return;
-      
       tabs.forEach(t => t.classList.remove('on'));
       tab.classList.add('on');
-
       const target = tab.dataset.target;
-      sections.forEach(sec => {
-        sec.hidden = sec.id !== `sec-${target}`;
-      });
-
-      if (target === 'clientes') {
-        loadClients();
-      }
+      sections.forEach(sec => { sec.hidden = sec.id !== `sec-${target}`; });
+      if (target === 'clientes') loadClients();
     });
   });
 
@@ -57,29 +86,49 @@ document.addEventListener('DOMContentLoaded', () => {
   if (btnSettings) {
     btnSettings.addEventListener('click', () => {
       tabs.forEach(t => t.classList.remove('on'));
-      sections.forEach(sec => {
-        sec.hidden = sec.id !== 'sec-services';
-      });
+      sections.forEach(sec => { sec.hidden = sec.id !== 'sec-services'; });
       loadServicesTable();
     });
   }
 
-  // Checkbox de suplemento opcional
+  // Checkbox suplemento opcional
   const chkToggleExtra = $('#chk-toggle-extra');
   const extraContainer = $('#extra-fields-container');
   if (chkToggleExtra && extraContainer) {
     chkToggleExtra.addEventListener('change', (e) => {
-      if (e.target.checked) {
-        extraContainer.style.display = 'block';
-      } else {
-        extraContainer.style.display = 'none';
+      extraContainer.style.display = e.target.checked ? 'block' : 'none';
+      if (!e.target.checked) {
         $('#pres_extra_concept').value = '';
         $('#pres_extra_price').value = '';
       }
     });
   }
 
-  // Desplegables en cascada (Categoría -> Subtipo -> Lista de Servicios con Checks)
+  // Botón para añadir suplemento al presupuesto en la derecha
+  const btnAddExtra = $('#b-add-extra');
+  if (btnAddExtra) {
+    btnAddExtra.addEventListener('click', () => {
+      const concept = $('#pres_extra_concept').value.trim();
+      const price = parseFloat($('#pres_extra_price').value) || 0;
+      if (!concept || price <= 0) {
+        return toast('Introduce un concepto y un importe válido para el suplemento.', true);
+      }
+      currentQuoteLines.push({
+        service_name: `Suplemento: ${concept}`,
+        unit: 'servicio',
+        qty: 1,
+        unit_price: price
+      });
+      renderQuotePreview();
+      $('#pres_extra_concept').value = '';
+      $('#pres_extra_price').value = '';
+      $('#chk-toggle-extra').checked = false;
+      extraContainer.style.display = 'none';
+      toast('Suplemento añadido al presupuesto');
+    });
+  }
+
+  // Desplegables en cascada (Categoría -> Subtipo -> Checks)
   const categorySelect = $('#pres_category');
   const subserviceContainer = $('#subservice-container');
   const subserviceSelect = $('#pres_subservice');
@@ -98,7 +147,6 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
       }
 
-      // Filtrar subtipos únicos (almacenados en el campo description de cada servicio)
       const matchingServices = servicesListCache.filter(s => s.category === cat);
       const subservices = [...new Set(matchingServices.map(s => s.description).filter(Boolean))];
 
@@ -120,7 +168,6 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
       }
 
-      // Obtener todos los servicios que pertenecen a esta categoría y subtipo
       const servicesInSub = servicesListCache.filter(s => s.category === cat && s.description === sub);
 
       if (servicesInSub.length > 0) {
@@ -130,7 +177,7 @@ document.addEventListener('DOMContentLoaded', () => {
           return `
             <div class="pkg-item-row" style="display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 6px 0; border-bottom: 1px solid #eee;">
               <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; margin: 0; cursor: pointer; flex: 1;">
-                <input type="checkbox" class="pkg-item-chk" data-id="${s.id}" data-name="${esc(s.name)}" data-price="${s.price}" data-unit="${esc(s.unit)}" checked style="width: auto; min-height: auto;">
+                <input type="checkbox" class="pkg-item-chk" data-name="${esc(s.name)}" data-price="${s.price}" data-unit="${esc(s.unit)}" checked style="width: auto; min-height: auto;">
                 <span><strong>${esc(s.name)}</strong> <span class="muted">(${Number(s.price).toFixed(2)} € / ${esc(s.unit)})</span></span>
               </label>
               ${needsQty ? `<div style="display: flex; align-items: center; gap: 4px;"><input type="number" class="pkg-item-qty" min="1" step="1" value="1" style="width: 70px; padding: 4px; font-size: 12px;"><small class="muted">${esc(s.unit)}</small></div>` : '<input type="hidden" class="pkg-item-qty" value="1">'}
@@ -143,7 +190,40 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Botón limpiar formulario de presupuesto
+  // Botón "Añadir servicios seleccionados al presupuesto" (Pasa los checks de la izq a la derecha)
+  const btnAddLines = $('#b-add-lines');
+  if (btnAddLines) {
+    btnAddLines.addEventListener('click', () => {
+      const checkedRows = document.querySelectorAll('.pkg-item-row');
+      let addedCount = 0;
+
+      checkedRows.forEach((row) => {
+        const chk = row.querySelector('.pkg-item-chk');
+        if (chk && chk.checked) {
+          const qtyInput = row.querySelector('.pkg-item-qty');
+          const qty = parseFloat(qtyInput ? qtyInput.value : 1) || 1;
+          const unitPrice = parseFloat(chk.dataset.price) || 0;
+
+          currentQuoteLines.push({
+            service_name: chk.dataset.name,
+            unit: chk.dataset.unit,
+            qty: qty,
+            unit_price: unitPrice
+          });
+          addedCount++;
+        }
+      });
+
+      if (addedCount === 0) {
+        return toast('Selecciona al menos un servicio con el check.', true);
+      }
+
+      renderQuotePreview();
+      toast(`${addedCount} servicio(s) añadido(s) al resumen`);
+    });
+  }
+
+  // Botón limpiar formulario completo y resumen
   const btnResetPresupuesto = $('#b-reset-presupuesto');
   const formPresupuesto = $('#f-presupuesto');
   if (btnResetPresupuesto && formPresupuesto) {
@@ -151,12 +231,105 @@ document.addEventListener('DOMContentLoaded', () => {
       formPresupuesto.reset();
       $('#pres_client_code').value = '';
       delete $('#pres_client_code').dataset.id;
+      currentQuoteLines = [];
+      renderQuotePreview();
       if (extraContainer) extraContainer.style.display = 'none';
       if (subserviceContainer) subserviceContainer.style.display = 'none';
       if (packageContainer) packageContainer.style.display = 'none';
       if (packageItemsList) packageItemsList.innerHTML = '';
       $('#pres-result-info').textContent = '';
-      toast('Formulario de presupuesto restablecido');
+      toast('Formulario y presupuesto restablecidos');
+    });
+  }
+
+  // Guardar y Emitir Presupuesto en Supabase
+  const btnSaveQuote = $('#b-save-presupuesto');
+  if (btnSaveQuote) {
+    btnSaveQuote.addEventListener('click', async () => {
+      const phone = $('#pres_phone').value.trim();
+      const name = $('#pres_name').value.trim();
+      const email = $('#pres_email').value.trim() || null;
+      const locality = $('#pres_locality').value.trim() || 'No especificada';
+      const notes = $('#pres_notes').value.trim() || null;
+
+      if (digits(phone).length < 9) {
+        return toast('El teléfono debe tener al menos 9 dígitos.', true);
+      }
+      if (!name) {
+        return toast('El nombre o razón social es obligatorio.', true);
+      }
+      if (currentQuoteLines.length === 0) {
+        return toast('Debes añadir al menos un servicio o concepto al presupuesto.', true);
+      }
+
+      btnSaveQuote.disabled = true;
+      try {
+        let clientId = $('#pres_client_code').dataset.id;
+
+        if (!clientId) {
+          const duplicates = await findDuplicates({ phone, email });
+          if (duplicates.length > 0) {
+            clientId = duplicates[0].id;
+          } else {
+            const newClient = { name, phone, email, locality, kind: 'particular', notes: 'Cliente registrado automáticamente desde Presupuestos.' };
+            const { data: createdClient, error: clientErr } = await db.from('clients').insert(newClient).select().single();
+            if (clientErr) {
+              toast('Error al crear el cliente: ' + clientErr.message, true);
+              return;
+            }
+            clientId = createdClient.id;
+          }
+        }
+
+        let totalSubtotal = currentQuoteLines.reduce((acc, line) => acc + (line.unit_price * line.qty), 0);
+
+        let fullNotes = `Presupuesto generado con ${currentQuoteLines.length} líneas de servicio.`;
+        if (notes) fullNotes += ` Notas: ${notes}`;
+
+        const newQuote = {
+          client_id: clientId,
+          status: 'borrador',
+          subtotal: totalSubtotal,
+          total: totalSubtotal,
+          notes: fullNotes
+        };
+
+        const { data: quoteData, error: quoteErr } = await db.from('quotes').insert(newQuote).select().single();
+        if (quoteErr) {
+          toast('Error al generar el presupuesto: ' + quoteErr.message, true);
+          return;
+        }
+
+        // Insertar líneas de presupuesto en quote_lines
+        for (let i = 0; i < currentQuoteLines.length; i++) {
+          const line = currentQuoteLines[i];
+          await db.from('quote_lines').insert({
+            quote_id: quoteData.id,
+            service_name: line.service_name,
+            unit: line.unit,
+            qty: line.qty,
+            unit_price: line.unit_price,
+            pos: i
+          });
+        }
+
+        const numeroPresupuesto = quoteCode(quoteData.quote_no);
+        $('#pres-result-info').textContent = `¡Emitido! ID: ${numeroPresupuesto}`;
+        toast(`¡Presupuesto ${numeroPresupuesto} guardado correctamente!`);
+
+        // Limpiar estado
+        formPresupuesto.reset();
+        $('#pres_client_code').value = '';
+        delete $('#pres_client_code').dataset.id;
+        currentQuoteLines = [];
+        renderQuotePreview();
+        if (extraContainer) extraContainer.style.display = 'none';
+        if (subserviceContainer) subserviceContainer.style.display = 'none';
+        if (packageContainer) packageContainer.style.display = 'none';
+        if (packageItemsList) packageItemsList.innerHTML = '';
+      } finally {
+        btnSaveQuote.disabled = false;
+      }
     });
   }
 });
@@ -341,152 +514,6 @@ if (presPhoneInput && suggestionsBox) {
     }
   });
 }
-
-$('#f-presupuesto').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const btn = $('#b-save-presupuesto');
-  btn.disabled = true;
-
-  try {
-    const f = e.target;
-    const phone = f.elements['pres_phone'].value.trim();
-    const name = f.elements['pres_name'].value.trim();
-    const email = f.elements['pres_email'].value.trim() || null;
-    const locality = f.elements['pres_locality'].value.trim() || 'No especificada';
-    const category = f.elements['pres_category'].value;
-    const subservice = f.elements['pres_subservice'].value;
-    
-    const isExtraActive = $('#chk-toggle-extra').checked;
-    const extraConcept = isExtraActive ? f.elements['pres_extra_concept'].value.trim() : '';
-    const extraPrice = isExtraActive ? (parseFloat(f.elements['pres_extra_price'].value) || 0) : 0;
-    
-    const notes = f.elements['pres_notes'].value.trim() || null;
-
-    if (digits(phone).length < 9) {
-      toast('El teléfono debe tener al menos 9 dígitos.', true);
-      return;
-    }
-
-    let clientId = $('#pres_client_code').dataset.id;
-
-    if (!clientId) {
-      const duplicates = await findDuplicates({ phone, email });
-      if (duplicates.length > 0) {
-        clientId = duplicates[0].id;
-      } else {
-        const newClient = {
-          name,
-          phone,
-          email,
-          locality,
-          kind: 'particular',
-          notes: 'Cliente registrado automáticamente desde Presupuestos.'
-        };
-        const { data: createdClient, error: clientErr } = await db.from('clients').insert(newClient).select().single();
-        if (clientErr) {
-          toast('Error al crear el cliente: ' + clientErr.message, true);
-          return;
-        }
-        clientId = createdClient.id;
-      }
-    }
-
-    // Recopilar todos los servicios marcados con sus cantidades
-    const checkedRows = document.querySelectorAll('.pkg-item-row');
-    const selectedItems = [];
-    let servicesSubtotal = 0;
-
-    checkedRows.forEach((row) => {
-      const chk = row.querySelector('.pkg-item-chk');
-      if (chk && chk.checked) {
-        const qtyInput = row.querySelector('.pkg-item-qty');
-        const qty = parseFloat(qtyInput ? qtyInput.value : 1) || 1;
-        const unitPrice = parseFloat(chk.dataset.price) || 0;
-        const lineTotal = unitPrice * qty;
-
-        servicesSubtotal += lineTotal;
-        selectedItems.push({
-          name: chk.dataset.name,
-          unit: chk.dataset.unit,
-          qty: qty,
-          unit_price: unitPrice,
-          total: lineTotal
-        });
-      }
-    });
-
-    if (selectedItems.length === 0 && !extraPrice) {
-      toast('Debes seleccionar al menos un servicio o añadir un suplemento.', true);
-      btn.disabled = false;
-      return;
-    }
-
-    const totalSubtotal = servicesSubtotal + extraPrice;
-
-    let fullNotes = `Servicio: ${category} — Subtipo: ${subservice}`;
-    if (selectedItems.length > 0) {
-      fullNotes += ` | Incluye: ` + selectedItems.map(i => `${i.name} (${i.qty} ${i.unit})`).join(', ');
-    }
-    if (isExtraActive && extraConcept) {
-      fullNotes += ` | Suplemento extra: ${extraConcept} (${extraPrice.toFixed(2)} €)`;
-    }
-    if (notes) {
-      fullNotes += ` | Notas: ${notes}`;
-    }
-
-    const newQuote = {
-      client_id: clientId,
-      status: 'borrador',
-      subtotal: totalSubtotal,
-      total: totalSubtotal,
-      notes: fullNotes
-    };
-
-    const { data: quoteData, error: quoteErr } = await db.from('quotes').insert(newQuote).select().single();
-    if (quoteErr) {
-      toast('Error al generar el presupuesto: ' + quoteErr.message, true);
-      return;
-    }
-
-    // Insertar cada servicio marcado como una línea independiente en quote_lines
-    let linePos = 0;
-    for (const item of selectedItems) {
-      await db.from('quote_lines').insert({
-        quote_id: quoteData.id,
-        service_name: item.name,
-        unit: item.unit,
-        qty: item.qty,
-        unit_price: item.unit_price,
-        pos: linePos++
-      });
-    }
-
-    if (isExtraActive && extraConcept && extraPrice > 0) {
-      await db.from('quote_lines').insert({
-        quote_id: quoteData.id,
-        service_name: extraConcept,
-        unit: 'servicio',
-        qty: 1,
-        unit_price: extraPrice,
-        pos: linePos++
-      });
-    }
-
-    const numeroPresupuesto = quoteCode(quoteData.quote_no);
-    $('#pres-result-info').textContent = `¡Generado con éxito! ID: ${numeroPresupuesto}`;
-    toast(`Presupuesto ${numeroPresupuesto} creado correctamente`);
-    
-    f.reset();
-    $('#pres_client_code').value = '';
-    delete $('#pres_client_code').dataset.id;
-    if ($('#extra-fields-container')) extraContainer.style.display = 'none';
-    if ($('#subservice-container')) subserviceContainer.style.display = 'none';
-    if ($('#package-services-container')) packageContainer.style.display = 'none';
-    if ($('#package-items-list')) packageItemsList.innerHTML = '';
-  } finally {
-    btn.disabled = false;
-  }
-});
 
 /* ---------- Clientes ---------- */
 let clients = [];
