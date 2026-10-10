@@ -173,7 +173,7 @@ if (btnDownloadPdf) {
     const element = $('#pdf-printable-area');
     const opt = {
       margin:       10,
-      filename:     `Presupuesto_${activeModalQuoteCode}.pdf`,
+      filename:     `Presupuesto_${activeModalQuoteCode}_AlmaGest.pdf`,
       image:        { type: 'jpeg', quality: 0.98 },
       html2canvas:  { scale: 2, useCORS: true },
       jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
@@ -192,7 +192,7 @@ if (btnSendWhatsapp) {
     }
     const cleanPhone = digits(activeModalClientPhone);
     const mensaje = encodeURIComponent(
-      `Hola ${activeModalClientName}, le enviamos el presupuesto ${activeModalQuoteCode} de AlmaGest por un importe total de ${activeModalTotal.toFixed(2)} €.\n\nQuedamos a su disposición para cualquier consulta.`
+      `Hola ${activeModalClientName}, le enviamos el presupuesto ${activeModalQuoteCode} de AlmaGest por un importe total de ${activeModalTotal.toFixed(2)} €.\n\nAtentamente,\nAlmaGest · Aller, Asturias\nTel: +34 660 867 462`
     );
     window.open(`https://api.whatsapp.com/send?phone=34${cleanPhone}&text=${mensaje}`, '_blank');
 
@@ -212,7 +212,7 @@ if (btnSendEmail) {
     const emailRecipient = activeModalClientEmail ? encodeURIComponent(activeModalClientEmail) : '';
     const subject = encodeURIComponent(`Presupuesto ${activeModalQuoteCode} - AlmaGest`);
     const body = encodeURIComponent(
-      `Estimado/a ${activeModalClientName},\n\nAdjuntamos los detalles del presupuesto ${activeModalQuoteCode} por un importe total de ${activeModalTotal.toFixed(2)} €.\n\nAtentamente,\nAlmaGest`
+      `Estimado/a ${activeModalClientName},\n\nLe adjuntamos los detalles del presupuesto ${activeModalQuoteCode} por un importe total de ${activeModalTotal.toFixed(2)} €.\n\nQuedamos a su entera disposición para cualquier aclaración.\n\nAtentamente,\nAlmaGest · Servicios Profesionales Integrales\nAller, Asturias\nTeléfono: +34 660 867 462\nEmail: danieldominguezdjamel2018@gmail.com`
     );
     
     window.location.href = `mailto:${emailRecipient}?subject=${subject}&body=${body}`;
