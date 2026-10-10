@@ -61,8 +61,8 @@
             <input name="pres_locality" id="pres_locality" required maxlength="80" value="No especificada">
           </label>
           
-          <!-- Desplegables de servicios adaptados al catálogo -->
-          <label>Categoría de Servicio *
+          <!-- Desplegable principal de categoría -->
+          <label class="full">Categoría de Servicio *
             <select name="pres_category" id="pres_category" required>
               <option value="">Selecciona categoría...</option>
               <option value="Limpieza profesional">Limpieza profesional</option>
@@ -75,9 +75,11 @@
               <option value="Urgencias">Urgencias</option>
             </select>
           </label>
-          <label>Plan / Subtipo específico
+          
+          <!-- Subtipo condicional (oculto por defecto, solo se muestra en Segundas residencias) -->
+          <label id="subservice-container" class="full" style="display: none;">Plan / Subtipo específico
             <select name="pres_subservice" id="pres_subservice">
-              <option value="">(Opcional / Ninguno)</option>
+              <option value="">(Ninguno)</option>
               <option value="Plan Esencial">Plan Esencial</option>
               <option value="Plan Confort">Plan Confort</option>
               <option value="Plan Premium">Plan Premium</option>
@@ -85,7 +87,7 @@
             </select>
           </label>
 
-<!-- Checkbox para activar suplemento opcional -->
+          <!-- Checkbox para activar suplemento opcional -->
           <label class="full" style="display: flex; flex-direction: row; align-items: center; gap: 8px; cursor: pointer; margin-top: 4px;">
             <input type="checkbox" id="chk-toggle-extra" style="width: auto; min-height: auto;">
             <span>Añadir suplemento o concepto manual extraordinario</span>
