@@ -23,11 +23,20 @@ function toast(msg, isErr = false) {
 
 /* ---------- Gestión de Pestañas ---------- */
 document.addEventListener('DOMContentLoaded', () => {
-  document.querySelectorAll('header nav .tab').forEach((tab) => {
+  const tabs = document.querySelectorAll('header nav .tab');
+  const sections = document.querySelectorAll('.tab-section');
+
+  tabs.forEach((tab) => {
     tab.addEventListener('click', () => {
       if (tab.hasAttribute('disabled')) return;
-      document.querySelectorAll('header nav .tab').forEach(t => t.classList.remove('on'));
+      
+      tabs.forEach(t => t.classList.remove('on'));
       tab.classList.add('on');
+
+      const target = tab.dataset.target;
+      sections.forEach(sec => {
+        sec.hidden = sec.id !== `sec-${target}`;
+      });
     });
   });
 });
@@ -104,6 +113,13 @@ function openForm(c) {
     f.elements[k].value = c?.[k] ?? (k === 'kind' ? 'particular' : '');
   }
   $('#d-err').hidden = true;
+  
+  // Mostrar u ocultar botón de eliminar según si se está editando o creando
+  const btnDelete = $('#d-delete');
+  if (btnDelete) {
+    btnDelete.hidden = !c;
+  }
+
   $('#dlg').showModal();
 }
 
@@ -144,3 +160,21 @@ $('#f-client').addEventListener('submit', async (e) => {
     btn.disabled = false;
   }
 });
+
+/* ---------- Eliminar Cliente ---------- */
+const btnDelete = $('#d-delete');
+if (btnDelete) {
+  btnDelete.addEventListener('click', async () => {
+    const f = $('#f-client');
+    const id = f.dataset.id;
+    if (!id) return;
+
+    if (!confirm('¿Estás seguro de que deseas eliminar este cliente? Esta acción no se puede deshacer.')) return;
+
+    btnDelete.disabled = true;
+    try {
+      const { error } = await db.from('clients').delete().eq('id', id);
+      if (error) {
+        $('#d-err').textContent = error.message;
+        $('#d-err').hidden = false;
+        return
