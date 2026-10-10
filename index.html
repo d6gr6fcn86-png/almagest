@@ -42,7 +42,8 @@
       <aside class="sidebar">
         <div class="sidebar-section">
           <span class="sidebar-title">Módulos</span>
-          <button class="nav-btn on" type="button" data-target="presupuestos">Nuevo Presupuesto</button>
+          <button class="nav-btn on" type="button" data-target="inicio">Inicio</button>
+          <button class="nav-btn" type="button" data-target="presupuestos">Nuevo Presupuesto</button>
           <button class="nav-btn" type="button" data-target="historial">Historial Presupuestos</button>
           <button class="nav-btn" type="button" data-target="clientes">Gestión de Clientes</button>
           <button class="nav-btn" type="button" data-target="services">Catálogo de Servicios</button>
@@ -52,7 +53,11 @@
       <div class="main-content">
 
         <!-- 1. PRESUPUESTOS (doble panel) -->
-        <section id="sec-presupuestos" class="tab-section">
+        <!-- 0. INICIO (dashboard) -->
+        <section id="sec-inicio" class="tab-section"><div id="dash"></div></section>
+
+        <!-- 1. PRESUPUESTOS (doble panel) -->
+        <section id="sec-presupuestos" class="tab-section" hidden>
           <h2>Generador de Presupuestos Rápidos</h2>
           <div class="quote-layout">
 
