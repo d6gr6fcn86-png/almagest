@@ -76,22 +76,22 @@
             </select>
           </label>
           
-          <!-- Subtipo dinámico según la categoría -->
-          <label id="subservice-container" class="full" style="display: none;">Tipología / Plan del Servicio *
+          <!-- Servicio / Tarea específica del catálogo -->
+          <label id="subservice-container" class="full" style="display: none;">Servicio o Tarea del Catálogo *
             <select name="pres_subservice" id="pres_subservice">
-              <option value="">Selecciona tipología...</option>
+              <option value="">Selecciona servicio...</option>
             </select>
           </label>
 
-          <!-- Campo dinámico para Metros Cuadrados (m²) -->
-          <label id="sqm-container" class="full" style="display: none;">Metros cuadrados (m²) *
-            <input name="pres_sqm" id="pres_sqm" type="number" min="0" step="1" placeholder="Ej. 150">
+          <!-- Campo dinámico para Cantidad / Metros cuadrados (m²) u Horas -->
+          <label id="qty-container" class="full" style="display: none;"><span id="qty-label-text">Cantidad</span> *
+            <input name="pres_qty" id="pres_qty" type="number" min="1" step="1" value="1">
           </label>
 
-          <!-- Caja de checks de tareas incluidas en el paquete -->
-          <div id="package-details" class="full card" style="display: none; background: #f8fbf9; padding: 14px 16px; border-color: var(--border);">
-            <strong style="font-size: 13px; color: var(--brand); display: block; margin-bottom: 8px;">Ajustar tareas del paquete (desmarca las que no apliquen):</strong>
-            <div id="package-items-list" style="display: flex; flex-direction: column; gap: 6px;"></div>
+          <!-- Caja informativa de detalles del servicio -->
+          <div id="package-details" class="full card" style="display: none; background: #f8fbf9; padding: 12px 16px; border-color: var(--border);">
+            <strong style="font-size: 12px; color: var(--brand); display: block; margin-bottom: 4px;">Descripción del servicio:</strong>
+            <p id="package-description" class="muted" style="margin: 0; font-size: 13px;"></p>
           </div>
 
           <!-- Checkbox para activar suplemento opcional -->
@@ -202,7 +202,7 @@
       <h2 id="d-service-title">Nuevo Servicio</h2>
       <div class="grid">
         <label class="full">Categoría<input name="category" required maxlength="80" placeholder="Ej. Limpieza profesional"></label>
-        <label class="full">Nombre del Servicio *<input name="name" required maxlength="120" placeholder="Ej. Viviendas y propiedades"></label>
+        <label class="full">Nombre del Servicio *<input name="name" required maxlength="120" placeholder="Ej. Limpieza general y profunda"></label>
         <label>Unidad *
           <select name="unit" required>
             <option value="servicio">servicio</option>
@@ -214,7 +214,7 @@
           </select>
         </label>
         <label>Precio Unitario (€) *<input name="price" type="number" step="0.01" min="0" required></label>
-        <label class="full">Descripción / Servicios incluidos<textarea name="description" rows="2" maxlength="500"></textarea></label>
+        <label class="full">Descripción<textarea name="description" rows="2" maxlength="500"></textarea></label>
       </div>
       <p id="d-service-err" class="error" hidden></p>
       <div class="actions">
