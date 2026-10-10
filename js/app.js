@@ -37,6 +37,11 @@ document.addEventListener('DOMContentLoaded', () => {
       sections.forEach(sec => {
         sec.hidden = sec.id !== `sec-${target}`;
       });
+
+      // Si se pulsa en clientes, cargamos los datos de la tabla
+      if (target === 'clientes') {
+        loadClients();
+      }
     });
   });
 });
@@ -86,31 +91,45 @@ $('#f-presupuesto').addEventListener('submit', (e) => {
 /* ---------- Clientes ---------- */
 let clients = [];
 async function loadClients() {
-  const q = $('#search').value.trim();
+  const searchInput = $('#search');
+  const q = searchInput ? searchInput.value.trim() : '';
   const { data, error } = q
     ? await db.rpc('search_clients', { q })
     : await db.from('clients').select('*').order('created_at', { ascending: false }).limit(30);
   if (error) return toast(error.message, true);
   clients = data;
-  $('#empty').hidden = clients.length > 0;
-  $('#empty').textContent = q ? 'Ningún cliente coincide con la búsqueda.' : 'Aún no hay clientes. Crea el primero con «Nuevo cliente».';
   
-  $('#rows').innerHTML = clients.map((c) =>
-    `<tr data-id="${esc(c.id)}" tabindex="0">
-       <td onclick="event.stopPropagation()"><input type="checkbox" class="row-select" value="${esc(c.id)}" aria-label="Seleccionar cliente"></td>
-       <td>${code(c.code_num)}</td>
-       <td>${esc(c.name)}</td>
-       <td>${esc(c.phone)}</td>
-       <td>${esc(c.locality)}</td>
-       <td>${esc(KINDS[c.kind] || c.kind)}</td>
-     </tr>`
-  ).join('');
+  const emptyEl = $('#empty');
+  if (emptyEl) {
+    emptyEl.hidden = clients.length > 0;
+    emptyEl.textContent = q ? 'Ningún cliente coincide con la búsqueda.' : 'Aún no hay clientes. Crea el primero con «Nuevo cliente».';
+  }
+  
+  const rowsEl = $('#rows');
+  if (rowsEl) {
+    rowsEl.innerHTML = clients.map((c) =>
+      `<tr data-id="${esc(c.id)}" tabindex="0">
+         <td onclick="event.stopPropagation()"><input type="checkbox" class="row-select" value="${esc(c.id)}" aria-label="Seleccionar cliente"></td>
+         <td>${code(c.code_num)}</td>
+         <td>${esc(c.name)}</td>
+         <td>${esc(c.phone)}</td>
+         <td>${esc(c.locality)}</td>
+         <td>${esc(KINDS[c.kind] || c.kind)}</td>
+       </tr>`
+    ).join('');
+  }
 
   actualizarBotonEliminarMultiples();
 }
 
 let searchTimer;
-$('#search').addEventListener('input', () => { clearTimeout(searchTimer); searchTimer = setTimeout(loadClients, 250); });
+const searchEl = $('#search');
+if (searchEl) {
+  searchEl.addEventListener('input', () => { 
+    clearTimeout(searchTimer); 
+    searchTimer = setTimeout(loadClients, 250); 
+  });
+}
 
 // Abrir ficha al hacer clic en la fila (excepto si se hace clic en el checkbox)
 const openFromRow = (e) => {
@@ -118,11 +137,18 @@ const openFromRow = (e) => {
   const tr = e.target.closest('tr[data-id]');
   if (tr) openForm(clients.find((c) => c.id === tr.dataset.id));
 };
-$('#rows').addEventListener('click', openFromRow);
-$('#rows').addEventListener('keydown', (e) => { if (e.key === 'Enter') openFromRow(e); });
 
-$('#b-new').addEventListener('click', () => openForm(null));
-$('#d-cancel').addEventListener('click', () => $('#dlg').close());
+const rowsEl = $('#rows');
+if (rowsEl) {
+  rowsEl.addEventListener('click', openFromRow);
+  rowsEl.addEventListener('keydown', (e) => { if (e.key === 'Enter') openFromRow(e); });
+}
+
+const bNewEl = $('#b-new');
+if (bNewEl) bNewEl.addEventListener('click', () => openForm(null));
+
+const dCancelEl = $('#d-cancel');
+if (dCancelEl) dCancelEl.addEventListener('click', () => $('#dlg').close());
 
 function openForm(c) {
   const f = $('#f-client');
@@ -216,11 +242,13 @@ function actualizarBotonEliminarMultiples() {
   }
 }
 
-$('#rows').addEventListener('change', (e) => {
-  if (e.target.classList.contains('row-select')) {
-    actualizarBotonEliminarMultiples();
-  }
-});
+if (rowsEl) {
+  rowsEl.addEventListener('change', (e) => {
+    if (e.target.classList.contains('row-select')) {
+      actualizarBotonEliminarMultiples();
+    }
+  });
+}
 
 const selectAllCheckbox = $('#select-all');
 if (selectAllCheckbox) {
