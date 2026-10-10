@@ -66,6 +66,7 @@ document.body.insertAdjacentHTML('beforeend', `
     <label>Correo<input name="email" type="email" maxlength="120"></label>
     <label>IVA (%)<input name="iva_pct" type="number" step="0.01" min="0" max="100" required></label>
     <label>Validez del presupuesto (días)<input name="valid_days" type="number" step="1" min="1" max="365" required></label>
+    <label>Avisar si no responden en (días)<input name="followup_days" type="number" step="1" min="1" max="90" required></label>
     <label class="full">Condiciones (pie del presupuesto)<textarea name="terms" rows="3" maxlength="600"></textarea></label>
   </div>
   <p id="d-company-err" class="error" hidden></p>
@@ -74,7 +75,7 @@ document.body.insertAdjacentHTML('beforeend', `
 $('.sidebar-section').insertAdjacentHTML('beforeend', '<button class="nav-btn" id="b-company" type="button">Datos de empresa</button>');
 $('#b-company').addEventListener('click', () => {
   const f = $('#f-company');
-  for (const k of ['company_name', 'phone', 'email', 'iva_pct', 'valid_days', 'terms']) f.elements[k].value = company[k] ?? '';
+  for (const k of ['company_name', 'phone', 'email', 'iva_pct', 'valid_days', 'followup_days', 'terms']) f.elements[k].value = company[k] ?? '';
   $('#d-company-err').hidden = true;
   $('#dlg-company').showModal();
 });
@@ -85,7 +86,7 @@ $('#f-company').addEventListener('submit', async (e) => {
   const v = {
     company_name: f.elements.company_name.value.trim() || null, phone: f.elements.phone.value.trim() || null,
     email: f.elements.email.value.trim() || null, terms: f.elements.terms.value.trim() || null,
-    iva_pct: parseFloat(f.elements.iva_pct.value), valid_days: parseInt(f.elements.valid_days.value, 10),
+    iva_pct: parseFloat(f.elements.iva_pct.value), valid_days: parseInt(f.elements.valid_days.value, 10), followup_days: parseInt(f.elements.followup_days.value, 10),
   };
   const { data: ex } = await db.from('settings').select('org_id').maybeSingle();
   const { error } = ex ? await db.from('settings').update(v).eq('org_id', ex.org_id) : await db.from('settings').insert(v);
@@ -420,11 +421,82 @@ $('#b-send-email').addEventListener('click', () => {
 });
 $('#b-close-preview').addEventListener('click', () => $('#dlg-quote-preview').close());
 
+/* ---------- Inicio (dashboard) ---------- */
+function dashStats(monthRows, pendingRows, now, validDays, followDays) {
+  const start = new Date(now.getFullYear(), now.getMonth(), 1);
+  const ref = (q) => new Date(q.sent_at || q.created_at);
+  const sent = monthRows.filter((q) => q.status !== 'borrador' && ref(q) >= start);
+  const acc = sent.filter((q) => q.status === 'aceptado' || q.status === 'facturado');
+  const sum = (a) => round2(a.reduce((s, q) => s + Number(q.total), 0));
+  const pend = pendingRows.map((q) => ({ ...q, days: Math.floor((now - ref(q)) / 864e5) })).sort((a, b) => b.days - a.days);
+  return {
+    sent, acc, sentTotal: sum(sent), accTotal: sum(acc),
+    rate: sent.length ? Math.round((acc.length / sent.length) * 100) : 0,
+    pend, pendTotal: sum(pend),
+    expired: pend.filter((q) => q.days > validDays),
+    waiting: pend.filter((q) => q.days > followDays && q.days <= validDays),
+  };
+}
+async function loadDashboard() {
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+  const cols = 'id, quote_no, status, total, created_at, sent_at, clients(name)';
+  const [month, pending, recent, drafts, newClients] = await Promise.all([
+    db.from('quotes').select(cols).or(`sent_at.gte.${monthStart},created_at.gte.${monthStart}`).limit(1000),
+    db.from('quotes').select(cols).eq('status', 'emitido').limit(500),
+    db.from('quotes').select(cols).order('created_at', { ascending: false }).limit(5),
+    db.from('quotes').select('id', { count: 'exact', head: true }).eq('status', 'borrador'),
+    db.from('clients').select('id', { count: 'exact', head: true }).gte('created_at', monthStart),
+  ]);
+  const failed = [month, pending, recent].find((r) => r.error);
+  if (failed) return toast('No se pudo cargar el inicio: ' + failed.error.message, true);
+
+  const validDays = +company.valid_days || 30;
+  const followDays = +company.followup_days || 7;
+  const s = dashStats(month.data, pending.data, now, validDays, followDays);
+  const h = now.getHours();
+  const greet = h < 14 ? 'Buenos días' : h < 21 ? 'Buenas tardes' : 'Buenas noches';
+  const date = new Intl.DateTimeFormat('es-ES', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(now);
+  const monthName = new Intl.DateTimeFormat('es-ES', { month: 'long' }).format(now);
+  const nDrafts = drafts.count || 0;
+
+  const kpis = [
+    { l: 'Enviados este mes', v: s.sent.length, s: monthName },
+    { l: 'Total presupuestado', v: eur(s.sentTotal), s: 'IVA incl. · enviados del mes' },
+    { l: 'Aceptados', v: s.acc.length, s: `de ${s.sent.length} enviados` },
+    { l: 'Importe aceptado', v: eur(s.accTotal), s: 'IVA incl.' },
+    { l: 'Tasa de aceptación', v: s.rate + ' %', s: 'sobre los enviados del mes' },
+    { l: 'Pendientes de respuesta', v: s.pend.length, s: eur(s.pendTotal) + ' en juego', cls: s.expired.length ? 'err' : s.waiting.length ? 'warn' : '' },
+    { l: 'Clientes nuevos', v: newClients.count || 0, s: 'este mes' },
+  ];
+  const item = (q, cls, right) => `<li class="att ${cls}" data-open="${esc(q.id)}" tabindex="0"><span><strong>${quoteCode(q.quote_no)}</strong> · ${esc(q.clients?.name || 'Cliente')}</span><span>${right}</span></li>`;
+  const pendList = (arr, cls) => arr.slice(0, 6).map((q) => item(q, cls, `${q.days} días · <strong>${eur(q.total)}</strong>`)).join('')
+    + (arr.length > 6 ? `<li class="muted" style="padding:6px 0">y ${arr.length - 6} más en el historial</li>` : '');
+  let att = '';
+  if (s.expired.length) att += `<h4 class="att-h err">Vencidos: sin respuesta tras más de ${validDays} días (${s.expired.length})</h4><ul class="att-list">${pendList(s.expired, 'err')}</ul>`;
+  if (s.waiting.length) att += `<h4 class="att-h warn">Sin respuesta tras más de ${followDays} días (${s.waiting.length})</h4><ul class="att-list">${pendList(s.waiting, 'warn')}</ul>`;
+  if (nDrafts) att += `<p class="muted" style="margin-top:12px">📌 ${nDrafts} borrador${nDrafts > 1 ? 'es' : ''} sin enviar</p>`;
+  if (!att) att = '<p class="muted">Todo al día: no hay presupuestos pendientes de seguimiento.</p>';
+
+  const last = recent.data.length
+    ? '<ul class="att-list">' + recent.data.map((q) => item(q, 'ok', `<span style="padding:2px 7px;border-radius:4px;font-size:11px;font-weight:600;${STATUS_STYLE[q.status] || ''}">${esc(q.status.toUpperCase())}</span> <strong>${eur(q.total)}</strong>`)).join('') + '</ul>'
+    : '<p class="muted">Aún no hay presupuestos.</p>';
+
+  $('#dash').innerHTML = `
+    <div class="dash-head"><h2>${greet}</h2><p class="muted" style="margin:2px 0 0">${date[0].toUpperCase() + date.slice(1)}${company.company_name ? ' · ' + esc(company.company_name) : ''}</p></div>
+    <div class="kpi-grid">${kpis.map((k) => `<div class="kpi ${k.cls || ''}"><span class="l">${k.l}</span><span class="v">${k.v}</span><span class="s">${k.s}</span></div>`).join('')}</div>
+    <div class="dash-cols"><div class="card"><h3>Requieren atención</h3>${att}</div><div class="card"><h3>Últimos presupuestos</h3>${last}</div></div>`;
+}
+$('#dash').addEventListener('click', (e) => { const o = e.target.closest('[data-open]'); if (o) openQuotePreview(o.dataset.open); });
+$('#dash').addEventListener('keydown', (e) => { const o = e.key === 'Enter' && e.target.closest('[data-open]'); if (o) openQuotePreview(o.dataset.open); });
+$('#dlg-quote-preview').addEventListener('close', () => { if (!$('#sec-inicio').hidden) loadDashboard(); });
+
 /* ---------- Navegación ---------- */
 $$('.sidebar .nav-btn[data-target]').forEach((btn) => btn.addEventListener('click', () => {
   $$('.sidebar .nav-btn[data-target]').forEach((b) => b.classList.toggle('on', b === btn));
   const target = btn.dataset.target;
   $$('.main-content .tab-section').forEach((sec) => (sec.hidden = sec.id !== `sec-${target}`));
+  if (target === 'inicio') loadDashboard();
   if (target === 'presupuestos') cacheServices();
   if (target === 'clientes') loadClients();
   if (target === 'services') loadServicesTable();
@@ -435,11 +507,11 @@ $$('.sidebar .nav-btn[data-target]').forEach((btn) => btn.addEventListener('clic
 let appShown = false;
 db.auth.onAuthStateChange((event, session) => {
   if (event === 'PASSWORD_RECOVERY') { appShown = false; return show('recovery'); }
-  if (!session) { appShown = false; services = []; lines = []; clients = []; active = null; company = { ...company, company_name: '', phone: '', email: '', terms: '' }; return show('login'); }
+  if (!session) { appShown = false; services = []; lines = []; clients = []; active = null; $('#dash').innerHTML = ''; company = { ...company, company_name: '', phone: '', email: '', terms: '' }; return show('login'); }
   if (!appShown) {
     appShown = true;
     show('app');
-    setTimeout(() => { loadCompany(); cacheServices(); loadClients(); }, 0);
+    setTimeout(async () => { await loadCompany(); loadDashboard(); cacheServices(); loadClients(); }, 0);
   }
 });
 $('#f-login').addEventListener('submit', async (e) => {
@@ -461,7 +533,7 @@ $('#f-recovery').addEventListener('submit', async (e) => {
   toast('Contraseña actualizada');
   appShown = true;
   show('app');
-  loadCompany(); cacheServices(); loadClients();
+  loadCompany().then(loadDashboard); cacheServices(); loadClients();
 });
 $('#b-logout').addEventListener('click', () => db.auth.signOut());
 
