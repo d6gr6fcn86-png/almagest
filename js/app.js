@@ -88,6 +88,21 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
   }
+
+  // Botón de limpiar / resetear formulario de presupuesto
+  const btnResetPresupuesto = $('#b-reset-presupuesto');
+  const formPresupuesto = $('#f-presupuesto');
+  if (btnResetPresupuesto && formPresupuesto) {
+    btnResetPresupuesto.addEventListener('click', () => {
+      formPresupuesto.reset();
+      $('#pres_client_code').value = '';
+      delete $('#pres_client_code').dataset.id;
+      if (extraContainer) extraContainer.style.display = 'none';
+      if (subserviceContainer) subserviceContainer.style.display = 'none';
+      $('#pres-result-info').textContent = '';
+      toast('Formulario de presupuesto restablecido');
+    });
+  }
 });
 
 /* ---------- Sesión ---------- */
