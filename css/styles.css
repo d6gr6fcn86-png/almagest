@@ -77,6 +77,9 @@ input:focus, select:focus, textarea:focus {
   border-color: var(--primary);
 }
 
+/* Las casillas no heredan el tamaño de los campos de texto */
+input[type=checkbox] { width: auto; min-height: 0; padding: 0; }
+
 .btn {
   font: inherit;
   font-weight: 600;
@@ -128,7 +131,7 @@ input:focus, select:focus, textarea:focus {
 }
 .top strong { font-size: 17px; }
 
-/* Layout con Barra Lateral Izquierda */
+/* Layout con barra lateral izquierda */
 .app-layout {
   display: flex;
   min-height: calc(100vh - 51px);
@@ -197,7 +200,7 @@ input:focus, select:focus, textarea:focus {
   margin-bottom: 0;
 }
 
-/* Estilos para el filtro de embudo por estado */
+/* Filtro de embudo por estado */
 .filter-funnel-wrapper {
   position: relative;
   display: flex;
@@ -242,7 +245,7 @@ tbody tr:hover, tbody tr:focus {
   outline: 0;
 }
 
-/* Rejilla de Presupuestos Doble Panel */
+/* Rejilla de presupuestos, doble panel */
 .quote-layout {
   display: grid;
   grid-template-columns: 1fr;
