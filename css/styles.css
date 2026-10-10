@@ -12,7 +12,7 @@ label{display:grid;gap:5px;font-size:12px;font-weight:500;color:var(--muted)}
 input,select,textarea{font:inherit;color:var(--text);background:#fff;border:1px solid #7FA38F;border-radius:6px;padding:8px 10px;min-height:36px;width:100%}
 input:hover,select:hover,textarea:hover{border-color:var(--primary)}
 input:focus,select:focus,textarea:focus{outline:2px solid #2D6A4F55;border-color:var(--primary)}
-.btn{font:inherit;font-weight:600;background:var(--primary);color:#fff;border:0;border-radius:8px;padding:9px 16px;min-height:38px;cursor:pointer}
+.btn{font:inherit;font-weight:600;background:var(--primary);color:#fff;border:0;border-radius:8px;padding:9px 16px;min-height:38px;cursor:pointer;white-space:nowrap}
 .btn:hover{background:var(--primary-h)}.btn:disabled{opacity:.6;cursor:default}
 .btn.ghost{background:#fff;color:var(--primary);border:1px solid var(--primary)}.btn.ghost:hover{background:var(--tint)}
 .btn.ghost.red{color:var(--err);border-color:var(--err)}.btn.ghost.red:hover{background:#fdf2f2}
@@ -79,6 +79,17 @@ input:focus,select:focus,textarea:focus{outline:2px solid #2D6A4F55;border-color
   overflow-x: auto;
 }
 
+.bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.bar input {
+  flex: 1;
+  margin-bottom: 0;
+}
+
 .tablebox{overflow-x:auto}
 table{width:100%;border-collapse:collapse}
 th,td{text-align:left;padding:10px 14px;border-bottom:1px solid #E3ECE6;white-space:nowrap}
@@ -138,4 +149,5 @@ dialog::backdrop{background:#0006}
   .sidebar{width:100%;flex-direction:row;overflow-x:auto;padding:10px}
   .sidebar-section{flex-direction:row}
   .sidebar-title{display:none}
+  .bar{flex-direction:column;align-items:stretch}
 }
