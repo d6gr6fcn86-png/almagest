@@ -57,7 +57,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-// Alternar visibilidad de los campos de suplemento opcional
+  // Alternar visibilidad de los campos de suplemento opcional
   const chkToggleExtra = $('#chk-toggle-extra');
   const extraContainer = $('#extra-fields-container');
   if (chkToggleExtra && extraContainer) {
@@ -68,6 +68,23 @@ document.addEventListener('DOMContentLoaded', () => {
         extraContainer.style.display = 'none';
         $('#pres_extra_concept').value = '';
         $('#pres_extra_price').value = '';
+      }
+    });
+  }
+
+  // Mostrar u ocultar el subtipo según la categoría seleccionada
+  const categorySelect = $('#pres_category');
+  const subserviceContainer = $('#subservice-container');
+  const subserviceSelect = $('#pres_subservice');
+
+  if (categorySelect && subserviceContainer) {
+    categorySelect.addEventListener('change', (e) => {
+      const val = e.target.value;
+      if (val === 'Segundas residencias') {
+        subserviceContainer.style.display = 'grid';
+      } else {
+        subserviceContainer.style.display = 'none';
+        if (subserviceSelect) subserviceSelect.value = '';
       }
     });
   }
@@ -351,6 +368,7 @@ $('#f-presupuesto').addEventListener('submit', async (e) => {
     $('#pres_client_code').value = '';
     delete $('#pres_client_code').dataset.id;
     if ($('#extra-fields-container')) $('#extra-fields-container').style.display = 'none';
+    if ($('#subservice-container')) $('#subservice-container').style.display = 'none';
   } finally {
     btn.disabled = false;
   }
