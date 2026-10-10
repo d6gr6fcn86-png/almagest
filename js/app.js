@@ -6,6 +6,7 @@ const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '
 const digits = (v) => (v || '').replace(/\D/g, '');
 const last9 = (v) => digits(v).slice(-9);
 const code = (n) => 'C-' + String(n).padStart(4, '0');
+const quoteCode = (n) => 'P-' + String(n).padStart(4, '0');
 const KINDS = { particular: 'Particular', empresa: 'Empresa', comunidad: 'Comunidad' };
 
 function show(view) {
@@ -38,12 +39,15 @@ document.addEventListener('DOMContentLoaded', () => {
         sec.hidden = sec.id !== `sec-${target}`;
       });
 
-      // Si se pulsa en clientes, cargamos los datos de la tabla
       if (target === 'clientes') {
         loadClients();
+      } else if (target === 'presupuestos') {
+        loadClientsForDatalist();
       }
     });
   });
+
+  loadClientsForDatalist();
 });
 
 /* ---------- Sesión ---------- */
@@ -81,11 +85,114 @@ $('#f-recovery').addEventListener('submit', async (e) => {
 });
 $('#b-logout').addEventListener('click', () => db.auth.signOut());
 
-/* ---------- Formulario Presupuestos ---------- */
-$('#f-presupuesto').addEventListener('submit', (e) => {
+/* ---------- Búsqueda y Autocompletado por Teléfono en Presupuestos ---------- */
+let allClientsForDatalist = [];
+
+async function loadClientsForDatalist() {
+  const { data } = await db.from('clients').select('id, code_num, name, phone, email, locality').order('name');
+  if (!data) return;
+  allClientsForDatalist = data;
+  
+  const datalist = $('#phones-list');
+  if (datalist) {
+    datalist.innerHTML = data.map(c => 
+      `<option value="${esc(c.phone)}">${esc(c.name)} (${code(c.code_num)})</option>`
+    ).join('');
+  }
+}
+
+const presPhoneInput = $('#pres_phone');
+if (presPhoneInput) {
+  presPhoneInput.addEventListener('input', (e) => {
+    const val = digits(e.target.value);
+    const found = allClientsForDatalist.find(c => digits(c.phone) === val || c.phone.includes(val));
+    
+    if (found && val.length >= 4) {
+      $('#pres_name').value = found.name;
+      $('#pres_email').value = found.email || '';
+      $('#pres_locality').value = found.locality || 'No especificada';
+      $('#pres_client_code').value = code(found.code_num);
+      $('#pres_client_code').dataset.id = found.id;
+    } else if (!val) {
+      $('#pres_name').value = '';
+      $('#pres_email').value = '';
+      $('#pres_locality').value = 'No especificada';
+      $('#pres_client_code').value = '';
+      delete $('#pres_client_code').dataset.id;
+    }
+  });
+}
+
+$('#f-presupuesto').addEventListener('submit', async (e) => {
   e.preventDefault();
-  toast('Presupuesto generado correctamente (Simulación)');
-  e.target.reset();
+  const btn = $('#b-save-presupuesto');
+  btn.disabled = true;
+
+  try {
+    const f = e.target;
+    const phone = f.elements['pres_phone'].value.trim();
+    const name = f.elements['pres_name'].value.trim();
+    const email = f.elements['pres_email'].value.trim() || null;
+    const locality = f.elements['pres_locality'].value.trim() || 'No especificada';
+    const serviceName = f.elements['pres_service'].value;
+    const notes = f.elements['pres_notes'].value.trim() || null;
+
+    if (digits(phone).length < 9) {
+      toast('El teléfono debe tener al menos 9 dígitos.', true);
+      return;
+    }
+
+    let clientId = $('#pres_client_code').dataset.id;
+
+    // Si no está vinculado, buscamos por duplicado o creamos uno nuevo
+    if (!clientId) {
+      const duplicates = await findDuplicates({ phone, email });
+      if (duplicates.length > 0) {
+        clientId = duplicates[0].id;
+      } else {
+        const newClient = {
+          name,
+          phone,
+          email,
+          locality,
+          kind: 'particular',
+          notes: 'Cliente registrado automáticamente desde Presupuestos.'
+        };
+        const { data: createdClient, error: clientErr } = await db.from('clients').insert(newClient).select().single();
+        if (clientErr) {
+          toast('Error al crear el cliente: ' + clientErr.message, true);
+          return;
+        }
+        clientId = createdClient.id;
+      }
+    }
+
+    // Insertar el presupuesto en la tabla quotes[cite: 2]
+    const newQuote = {
+      client_id: clientId,
+      status: 'borrador',
+      subtotal: 0,
+      total: 0,
+      notes: notes
+    };
+
+    const { data: quoteData, error: quoteErr } = await db.from('quotes').insert(newQuote).select().single();
+    if (quoteErr) {
+      toast('Error al generar el presupuesto: ' + quoteErr.message, true);
+      return;
+    }
+
+    const numeroPresupuesto = quoteCode(quoteData.quote_no);
+    $('#pres-result-info').textContent = `¡Generado con éxito! ID: ${numeroPresupuesto}`;
+    toast(`Presupuesto ${numeroPresupuesto} creado correctamente`);
+    
+    f.reset();
+    $('#pres_client_code').value = '';
+    delete $('#pres_client_code').dataset.id;
+    loadClientsForDatalist();
+  } finally {
+    btn.disabled = false;
+  }
 });
 
 /* ---------- Clientes ---------- */
@@ -131,7 +238,6 @@ if (searchEl) {
   });
 }
 
-// Abrir ficha al hacer clic en la fila (excepto si se hace clic en el checkbox)
 const openFromRow = (e) => {
   if (e.target.type === 'checkbox') return;
   const tr = e.target.closest('tr[data-id]');
@@ -206,7 +312,7 @@ $('#f-client').addEventListener('submit', async (e) => {
   }
 });
 
-/* ---------- Eliminar Cliente Individual (desde la ficha) ---------- */
+/* ---------- Eliminar Cliente Individual ---------- */
 const btnDelete = $('#d-delete');
 if (btnDelete) {
   btnDelete.addEventListener('click', async () => {
