@@ -21,6 +21,17 @@ function toast(msg, isErr = false) {
   toastTimer = setTimeout(() => (t.hidden = true), 4000);
 }
 
+/* ---------- Gestión de Pestañas ---------- */
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('header nav .tab').forEach((tab) => {
+    tab.addEventListener('click', () => {
+      if (tab.hasAttribute('disabled')) return;
+      document.querySelectorAll('header nav .tab').forEach(t => t.classList.remove('on'));
+      tab.classList.add('on');
+    });
+  });
+});
+
 /* ---------- Sesión ---------- */
 let appShown = false;
 db.auth.onAuthStateChange((event, session) => {
