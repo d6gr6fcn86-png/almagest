@@ -259,6 +259,8 @@ $('#f-presupuesto').addEventListener('submit', async (e) => {
     const locality = f.elements['pres_locality'].value.trim() || 'No especificada';
     const category = f.elements['pres_category'].value;
     const subservice = f.elements['pres_subservice'].value;
+    const extraConcept = f.elements['pres_extra_concept'].value.trim();
+    const extraPrice = parseFloat(f.elements['pres_extra_price'].value) || 0;
     const notes = f.elements['pres_notes'].value.trim() || null;
 
     if (digits(phone).length < 9) {
@@ -290,18 +292,39 @@ $('#f-presupuesto').addEventListener('submit', async (e) => {
       }
     }
 
+    // Construir la descripción y total incluyendo el suplemento si existe
+    let fullNotes = `Servicio: ${category} ${subservice ? '(' + subservice + ')' : ''}`;
+    if (extraConcept) {
+      fullNotes += ` | Suplemento extra: ${extraConcept} (${extraPrice.toFixed(2)} €)`;
+    }
+    if (notes) {
+      fullNotes += ` | Notas: ${notes}`;
+    }
+
     const newQuote = {
       client_id: clientId,
       status: 'borrador',
-      subtotal: 0,
-      total: 0,
-      notes: `Servicio: ${category} ${subservice ? '(' + subservice + ')' : ''} — ${notes || ''}`
+      subtotal: extraPrice,
+      total: extraPrice,
+      notes: fullNotes
     };
 
     const { data: quoteData, error: quoteErr } = await db.from('quotes').insert(newQuote).select().single();
     if (quoteErr) {
       toast('Error al generar el presupuesto: ' + quoteErr.message, true);
       return;
+    }
+
+    // Si hay suplemento o concepto extra, lo añadimos opcionalmente como línea de presupuesto
+    if (extraConcept && extraPrice > 0) {
+      await db.from('quote_lines').insert({
+        quote_id: quoteData.id,
+        service_name: extraConcept,
+        unit: 'servicio',
+        qty: 1,
+        unit_price: extraPrice,
+        pos: 1
+      });
     }
 
     const numeroPresupuesto = quoteCode(quoteData.quote_no);
