@@ -76,7 +76,7 @@
             </select>
           </label>
           
-          <!-- Subtipo condicional (oculto por defecto, solo se muestra en Segundas residencias) -->
+          <!-- Subtipo condicional (oculto por defecto) -->
           <label id="subservice-container" class="full" style="display: none;">Plan / Subtipo específico
             <select name="pres_subservice" id="pres_subservice">
               <option value="">(Ninguno)</option>
@@ -110,7 +110,7 @@
           </label>
           <div class="actions full">
             <span id="pres-result-info" class="muted" style="align-self: center;"></span>
-            <span class="grow"></span>
+            <button class="btn ghost" type="button" id="b-reset-presupuesto">Limpiar formulario</button>
             <button class="btn" type="submit" id="b-save-presupuesto">Calcular y Generar Presupuesto</button>
           </div>
         </form>
