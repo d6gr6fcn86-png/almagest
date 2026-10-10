@@ -79,12 +79,12 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Dinámica de Categoría, Subtipos de Servicios y Unidades (m²)
+  // Dinámica de Categoría, Subtipos de Servicios, Unidades (m²) y Checks de Tareas
   const categorySelect = $('#pres_category');
   const subserviceContainer = $('#subservice-container');
   const subserviceSelect = $('#pres_subservice');
   const packageDetails = $('#package-details');
-  const packageDescription = $('#package-description');
+  const packageItemsList = $('#package-items-list');
   const sqmContainer = $('#sqm-container');
   const sqmInput = $('#pres_sqm');
 
@@ -93,7 +93,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const cat = categorySelect.value;
       subserviceSelect.innerHTML = '<option value="">Selecciona tipología...</option>';
       packageDetails.style.display = 'none';
-      packageDescription.textContent = '';
+      packageItemsList.innerHTML = '';
       if (sqmContainer) sqmContainer.style.display = 'none';
       if (sqmInput) sqmInput.value = '';
 
@@ -126,11 +126,17 @@ document.addEventListener('DOMContentLoaded', () => {
       }
 
       if (desc && selectedOpt.value) {
+        const items = desc.split(',').map(item => item.trim()).filter(Boolean);
+        packageItemsList.innerHTML = items.map((item, idx) => `
+          <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; margin: 0; cursor: pointer;">
+            <input type="checkbox" class="pkg-item-chk" value="${esc(item)}" checked style="width: auto; min-height: auto;">
+            <span>${esc(item)}</span>
+          </label>
+        `).join('');
         packageDetails.style.display = 'block';
-        packageDescription.textContent = desc;
       } else {
         packageDetails.style.display = 'none';
-        packageDescription.textContent = '';
+        packageItemsList.innerHTML = '';
       }
     });
   }
@@ -147,6 +153,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (subserviceContainer) subserviceContainer.style.display = 'none';
       if (sqmContainer) sqmContainer.style.display = 'none';
       if (packageDetails) packageDetails.style.display = 'none';
+      if (packageItemsList) packageItemsList.innerHTML = '';
       $('#pres-result-info').textContent = '';
       toast('Formulario de presupuesto restablecido');
     });
@@ -386,7 +393,10 @@ $('#f-presupuesto').addEventListener('submit', async (e) => {
     const matchedService = servicesListCache.find(s => s.category === category && s.name === subservice);
     const baseUnitPrice = matchedService && matchedService.price ? parseFloat(matchedService.price) : 0;
     const unit = matchedService ? matchedService.unit : 'servicio';
-    const serviceDesc = matchedService && matchedService.description ? matchedService.description : '';
+
+    // Capturar únicamente los ítems marcados por el usuario
+    const selectedPkgItems = Array.from(document.querySelectorAll('.pkg-item-chk:checked')).map(chk => chk.value);
+    const activeTasksDesc = selectedPkgItems.length > 0 ? selectedPkgItems.join(', ') : '';
 
     let quantity = 1;
     let finalServicePrice = baseUnitPrice;
@@ -399,8 +409,8 @@ $('#f-presupuesto').addEventListener('submit', async (e) => {
     const totalSubtotal = finalServicePrice + extraPrice;
 
     let fullNotes = `Servicio: ${category} — ${subservice} (${quantity} ${unit})`;
-    if (serviceDesc) {
-      fullNotes += ` [Incluye: ${serviceDesc}]`;
+    if (activeTasksDesc) {
+      fullNotes += ` [Tareas incluidas: ${activeTasksDesc}]`;
     }
     if (isExtraActive && extraConcept) {
       fullNotes += ` | Suplemento extra: ${extraConcept} (${extraPrice.toFixed(2)} €)`;
@@ -427,7 +437,7 @@ $('#f-presupuesto').addEventListener('submit', async (e) => {
       await db.from('quote_lines').insert({
         quote_id: quoteData.id,
         service_name: `${category}: ${subservice}`,
-        description: serviceDesc,
+        description: activeTasksDesc,
         unit: unit,
         qty: quantity,
         unit_price: baseUnitPrice,
@@ -457,6 +467,7 @@ $('#f-presupuesto').addEventListener('submit', async (e) => {
     if ($('#subservice-container')) $('#subservice-container').style.display = 'none';
     if ($('#sqm-container')) $('#sqm-container').style.display = 'none';
     if ($('#package-details')) $('#package-details').style.display = 'none';
+    if ($('#package-items-list')) $('#package-items-list').innerHTML = '';
   } finally {
     btn.disabled = false;
   }
