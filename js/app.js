@@ -423,26 +423,52 @@ $('#b-close-preview').addEventListener('click', () => $('#dlg-quote-preview').cl
 
 /* ---------- Inicio (dashboard) ---------- */
 function dashStats(monthRows, pendingRows, now, validDays, followDays) {
-  const start = new Date(now.getFullYear(), now.getMonth(), 1);
   const ref = (q) => new Date(q.sent_at || q.created_at);
-  const sent = monthRows.filter((q) => q.status !== 'borrador' && ref(q) >= start);
-  const acc = sent.filter((q) => q.status === 'aceptado' || q.status === 'facturado');
   const sum = (a) => round2(a.reduce((s, q) => s + Number(q.total), 0));
+  const bucket = (offset) => {
+    const a = new Date(now.getFullYear(), now.getMonth() + offset, 1);
+    const b = new Date(now.getFullYear(), now.getMonth() + offset + 1, 1);
+    const sent = monthRows.filter((q) => q.status !== 'borrador' && ref(q) >= a && ref(q) < b);
+    const acc = sent.filter((q) => q.status === 'aceptado' || q.status === 'facturado');
+    return { label: new Intl.DateTimeFormat('es-ES', { month: 'short' }).format(a).replace('.', ''), sent, acc, sentTotal: sum(sent), accTotal: sum(acc) };
+  };
+  const series = [-5, -4, -3, -2, -1, 0].map(bucket);
+  const cur = series[5];
   const pend = pendingRows.map((q) => ({ ...q, days: Math.floor((now - ref(q)) / 864e5) })).sort((a, b) => b.days - a.days);
   return {
-    sent, acc, sentTotal: sum(sent), accTotal: sum(acc),
-    rate: sent.length ? Math.round((acc.length / sent.length) * 100) : 0,
+    ...cur, series, prev: series[4],
+    rate: cur.sent.length ? Math.round((cur.acc.length / cur.sent.length) * 100) : 0,
     pend, pendTotal: sum(pend),
     expired: pend.filter((q) => q.days > validDays),
     waiting: pend.filter((q) => q.days > followDays && q.days <= validDays),
   };
 }
+/* Gráficos en SVG/CSS puro: sin librerías externas */
+function gaugeSvg(pct, label) {
+  const col = pct >= 50 ? '#2D6A4F' : pct >= 25 ? '#d9a400' : '#9B2226';
+  const arc = 'M 20 100 A 80 80 0 0 1 180 100';
+  return `<svg viewBox="0 0 200 118" class="gauge" role="img" aria-label="${esc(label)}: ${pct} %"><path d="${arc}" pathLength="100" class="g-bg"/>
+    ${pct ? `<path d="${arc}" pathLength="100" class="g-fg" stroke="${col}" stroke-dasharray="${pct} 100"/>` : ''}
+    <text x="100" y="92" class="g-v">${pct} %</text><text x="20" y="116" class="g-s">0</text><text x="180" y="116" class="g-s" text-anchor="end">100</text></svg>`;
+}
+function donutSvg(parts, total) {
+  let off = 0;
+  const segs = total ? parts.filter((p) => p.n).map((p) => {
+    const pct = (p.n / total) * 100;
+    const el = `<circle cx="50" cy="50" r="38" pathLength="100" class="d-seg" stroke="${p.c}" stroke-dasharray="${pct} ${100 - pct}" stroke-dashoffset="${-off}"/>`;
+    off += pct;
+    return el;
+  }).join('') : '';
+  return `<svg viewBox="0 0 100 100" class="donut" role="img" aria-label="Estado de los presupuestos enviados este mes"><circle cx="50" cy="50" r="38" class="d-bg"/>
+    <g transform="rotate(-90 50 50)">${segs}</g><text x="50" y="53" class="d-v">${total}</text><text x="50" y="65" class="d-s">enviados</text></svg>`;
+}
 async function loadDashboard() {
   const now = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+  const since = new Date(now.getFullYear(), now.getMonth() - 5, 1).toISOString();
   const cols = 'id, quote_no, status, total, created_at, sent_at, clients(name)';
   const [month, pending, recent, drafts, newClients] = await Promise.all([
-    db.from('quotes').select(cols).or(`sent_at.gte.${monthStart},created_at.gte.${monthStart}`).limit(1000),
+    db.from('quotes').select(cols).or(`sent_at.gte.${since},created_at.gte.${since}`).limit(1000),
     db.from('quotes').select(cols).eq('status', 'emitido').limit(500),
     db.from('quotes').select(cols).order('created_at', { ascending: false }).limit(5),
     db.from('quotes').select('id', { count: 'exact', head: true }).eq('status', 'borrador'),
@@ -459,16 +485,26 @@ async function loadDashboard() {
   const date = new Intl.DateTimeFormat('es-ES', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(now);
   const monthName = new Intl.DateTimeFormat('es-ES', { month: 'long' }).format(now);
   const nDrafts = drafts.count || 0;
+  const nNew = newClients.count || 0;
 
+  const delta = (a, b) => (b ? Math.round(((a - b) / b) * 100) : null);
+  const chip = (d) => (d === null ? '' : `<span class="chip ${d > 0 ? 'up' : d < 0 ? 'down' : 'flat'}" title="Frente al mes anterior">${d > 0 ? '▲' : d < 0 ? '▼' : '='} ${Math.abs(d)} %</span>`);
   const kpis = [
-    { l: 'Enviados este mes', v: s.sent.length, s: monthName },
-    { l: 'Total presupuestado', v: eur(s.sentTotal), s: 'IVA incl. · enviados del mes' },
-    { l: 'Aceptados', v: s.acc.length, s: `de ${s.sent.length} enviados` },
-    { l: 'Importe aceptado', v: eur(s.accTotal), s: 'IVA incl.' },
-    { l: 'Tasa de aceptación', v: s.rate + ' %', s: 'sobre los enviados del mes' },
-    { l: 'Pendientes de respuesta', v: s.pend.length, s: eur(s.pendTotal) + ' en juego', cls: s.expired.length ? 'err' : s.waiting.length ? 'warn' : '' },
-    { l: 'Clientes nuevos', v: newClients.count || 0, s: 'este mes' },
+    { l: 'Enviados este mes', v: s.sent.length, c: chip(delta(s.sent.length, s.prev.sent.length)), s: monthName },
+    { l: 'Total presupuestado', v: eur(s.sentTotal), c: chip(delta(s.sentTotal, s.prev.sentTotal)), s: 'IVA incl.' },
+    { l: 'Importe aceptado', v: eur(s.accTotal), c: chip(delta(s.accTotal, s.prev.accTotal)), s: `${s.acc.length} presupuesto${s.acc.length === 1 ? '' : 's'} aceptado${s.acc.length === 1 ? '' : 's'}` },
+    { l: 'Pendientes de respuesta', v: s.pend.length, c: '', s: eur(s.pendTotal) + ' en juego', cls: s.expired.length ? 'err' : s.waiting.length ? 'warn' : '' },
   ];
+
+  const nPend = s.sent.filter((q) => q.status === 'emitido').length;
+  const nLost = s.sent.length - s.acc.length - nPend;
+  const parts = [{ n: s.acc.length, c: '#2D6A4F', t: 'Aceptados' }, { n: nPend, c: '#3B82A0', t: 'Esperando respuesta' }, { n: nLost, c: '#9B2226', t: 'Rechazados o caducados' }];
+  const legend = parts.map((p) => `<li><i class="dot" style="background:${p.c}"></i>${p.t}<strong>${p.n}</strong></li>`).join('');
+
+  const max = Math.max(1, ...s.series.map((m) => m.sentTotal));
+  const bars = s.series.map((m) => `<div class="bcol" title="${esc(m.label)}: presupuestado ${eur(m.sentTotal)} · aceptado ${eur(m.accTotal)}">
+    <div class="bpair"><i class="b1" style="height:${(m.sentTotal / max) * 100}%"></i><i class="b2" style="height:${(m.accTotal / max) * 100}%"></i></div><span>${esc(m.label)}</span></div>`).join('');
+
   const item = (q, cls, right) => `<li class="att ${cls}" data-open="${esc(q.id)}" tabindex="0"><span><strong>${quoteCode(q.quote_no)}</strong> · ${esc(q.clients?.name || 'Cliente')}</span><span>${right}</span></li>`;
   const pendList = (arr, cls) => arr.slice(0, 6).map((q) => item(q, cls, `${q.days} días · <strong>${eur(q.total)}</strong>`)).join('')
     + (arr.length > 6 ? `<li class="muted" style="padding:6px 0">y ${arr.length - 6} más en el historial</li>` : '');
@@ -477,14 +513,19 @@ async function loadDashboard() {
   if (s.waiting.length) att += `<h4 class="att-h warn">Sin respuesta tras más de ${followDays} días (${s.waiting.length})</h4><ul class="att-list">${pendList(s.waiting, 'warn')}</ul>`;
   if (nDrafts) att += `<p class="muted" style="margin-top:12px">📌 ${nDrafts} borrador${nDrafts > 1 ? 'es' : ''} sin enviar</p>`;
   if (!att) att = '<p class="muted">Todo al día: no hay presupuestos pendientes de seguimiento.</p>';
-
   const last = recent.data.length
     ? '<ul class="att-list">' + recent.data.map((q) => item(q, 'ok', `<span style="padding:2px 7px;border-radius:4px;font-size:11px;font-weight:600;${STATUS_STYLE[q.status] || ''}">${esc(q.status.toUpperCase())}</span> <strong>${eur(q.total)}</strong>`)).join('') + '</ul>'
     : '<p class="muted">Aún no hay presupuestos.</p>';
 
   $('#dash').innerHTML = `
-    <div class="dash-head"><h2>${greet}</h2><p class="muted" style="margin:2px 0 0">${date[0].toUpperCase() + date.slice(1)}${company.company_name ? ' · ' + esc(company.company_name) : ''}</p></div>
-    <div class="kpi-grid">${kpis.map((k) => `<div class="kpi ${k.cls || ''}"><span class="l">${k.l}</span><span class="v">${k.v}</span><span class="s">${k.s}</span></div>`).join('')}</div>
+    <div class="dash-hero"><h2>${greet}</h2><p>${date[0].toUpperCase() + date.slice(1)}${company.company_name ? ' · ' + esc(company.company_name) : ''}${nNew ? ` · ${nNew} cliente${nNew > 1 ? 's' : ''} nuevo${nNew > 1 ? 's' : ''} este mes` : ''}</p></div>
+    <div class="kpi-grid">${kpis.map((k) => `<div class="kpi ${k.cls || ''}"><span class="l">${k.l}</span><span class="v">${k.v}${k.c}</span><span class="s">${k.s}</span></div>`).join('')}</div>
+    <div class="chart-grid">
+      <div class="card"><h3>Tasa de aceptación</h3>${gaugeSvg(s.rate, 'Tasa de aceptación')}<p class="muted" style="text-align:center;margin:4px 0 0">${s.acc.length} de ${s.sent.length} enviados este mes</p></div>
+      <div class="card"><h3>Estado de lo enviado</h3>${donutSvg(parts, s.sent.length)}<ul class="legend">${legend}</ul></div>
+      <div class="card"><h3>Últimos 6 meses</h3><div class="bars" role="img" aria-label="Evolución mensual de lo presupuestado y lo aceptado">${bars}</div>
+        <p class="muted" style="margin:8px 0 0"><i class="dot" style="background:#9CC5AE"></i> Presupuestado &nbsp; <i class="dot" style="background:#2D6A4F"></i> Aceptado</p></div>
+    </div>
     <div class="dash-cols"><div class="card"><h3>Requieren atención</h3>${att}</div><div class="card"><h3>Últimos presupuestos</h3>${last}</div></div>`;
 }
 $('#dash').addEventListener('click', (e) => { const o = e.target.closest('[data-open]'); if (o) openQuotePreview(o.dataset.open); });
