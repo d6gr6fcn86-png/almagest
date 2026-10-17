@@ -366,7 +366,7 @@ function pdfHtml(q, ls) {
     ${line('Base imponible:', eur(t.subtotal))}${line(`IVA (${+q.iva_pct}%):`, eur(t.tax))}
     ${line('TOTAL:', eur(t.total), 'border-top:2px solid #164B38;font-weight:bold;color:#164B38;font-size:15px;margin-top:4px;padding-top:6px')}</div></div>
   ${q.notes ? `<p style="margin-top:20px;font-size:12px"><strong>Observaciones:</strong> ${esc(q.notes)}</p>` : ''}
-  ${company.terms ? `<p style="margin-top:20px;font-size:11px;color:#4A6A5A">${esc(company.terms)}</p>` : ''}`;
+  ${company.terms ? `<div style="margin-top:30px;padding-top:10px;border-top:1px solid #E3ECE6;font-size:9px;line-height:1.3;color:#6C8577;">${esc(company.terms)}</div>` : ''}`;
 }
 async function openQuotePreview(id) {
   const { data: q, error } = await db.from('quotes').select('*, clients(*)').eq('id', id).single();
