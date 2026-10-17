@@ -369,7 +369,7 @@ function pdfHtml(q, ls) {
   ${company.terms ? `<p style="margin-top:20px;font-size:11px;color:#4A6A5A">${esc(company.terms)}</p>` : ''}`;
 }
 async function openQuotePreview(id) {
-  // Aseguramos que los datos de empresa estén cargados antes de maquetar el PDF
+  // 1. Aseguramos que los datos de la empresa estén listos
   await loadCompany();
 
   const { data: q, error } = await db.from('quotes').select('*, clients(*)').eq('id', id).single();
@@ -380,8 +380,15 @@ async function openQuotePreview(id) {
   active = { id, code: quoteCode(q.quote_no), name: q.clients?.name || 'Cliente', phone: q.clients?.phone || '', email: q.clients?.email || '', total: Number(q.total) };
   $('#preview-modal-title').textContent = `Presupuesto ${active.code}`;
   $('#quote-status-select').value = q.status;
+  
+  // Rellenamos el HTML inmediatamente
   $('#pdf-printable-area').innerHTML = pdfHtml(q, ls);
   $('#dlg-quote-preview').showModal();
+
+  // 2. Forzamos un pequeño respiro para que el DOM pinte el ancho correcto antes de la exportación o visualización
+  setTimeout(() => {
+    window.dispatchEvent(new Event('resize'));
+  }, 50);
 }
 async function setStatus(id, status) {
   const patch = { status };
