@@ -408,16 +408,29 @@ const signature = () => [company.company_name, company.phone && 'Tel: ' + compan
 $('#b-download-pdf').addEventListener('click', () => {
   if (!active) return;
   
-  html2pdf().from($('#pdf-printable-area')).set({
-    margin: 10, 
-    filename: `Presupuesto_${active.code}.pdf`, 
-    image: { type: 'jpeg', quality: 0.98 },
-    html2canvas: { scale: 2, useCORS: true, scrollX: 0, scrollY: 0 },
-    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }, 
-    pagebreak: { mode: ['css', 'legacy'], avoid: 'tr' },
-  }).save();
-  
-  toast('Descargando PDF...');
+  toast('Generando PDF...');
+
+  // Damos un pequeño respiro de 150ms para que el navegador estabilice 
+  // el renderizado del modal, ya sea abierto desde el Dashboard o el Historial
+  setTimeout(() => {
+    const element = $('#pdf-printable-area');
+
+    html2pdf().from(element).set({
+      margin: 10, 
+      filename: `Presupuesto_${active.code}.pdf`, 
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { 
+        scale: 2, 
+        useCORS: true, 
+        scrollX: 0, 
+        scrollY: 0,
+        // Forzamos un ancho de ventana virtual fijo para evitar recortes aleatorios
+        windowWidth: 800 
+      },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }, 
+      pagebreak: { mode: ['css', 'legacy'], avoid: 'tr' },
+    }).save();
+  }, 150);
 });
 $('#b-send-whatsapp').addEventListener('click', async () => {
   if (!active || !digits(active.phone)) return toast('El cliente no tiene un teléfono válido.', true);
