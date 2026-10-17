@@ -369,23 +369,14 @@ function pdfHtml(q, ls) {
   ${company.terms ? `<p style="margin-top:20px;font-size:11px;color:#4A6A5A">${esc(company.terms)}</p>` : ''}`;
 }
 async function openQuotePreview(id) {
-  // 1. ESPERAR OBLIGATORIAMENTE A QUE CARGUEN LOS DATOS DE LA EMPRESA
-  await loadCompany();
-
   const { data: q, error } = await db.from('quotes').select('*, clients(*)').eq('id', id).single();
   if (error || !q) return toast('No se pudo cargar el presupuesto', true);
-  
   const { data: ls, error: lErr } = await db.from('quote_lines').select('*').eq('quote_id', id).order('pos');
   if (lErr) return toast('No se pudieron cargar las líneas: ' + lErr.message, true);
-  
   active = { id, code: quoteCode(q.quote_no), name: q.clients?.name || 'Cliente', phone: q.clients?.phone || '', email: q.clients?.email || '', total: Number(q.total) };
-  
   $('#preview-modal-title').textContent = `Presupuesto ${active.code}`;
   $('#quote-status-select').value = q.status;
-  
-  // 2. Pintar el HTML asegurando que 'company' ya tiene nombre, teléfono y condiciones
   $('#pdf-printable-area').innerHTML = pdfHtml(q, ls);
-  
   $('#dlg-quote-preview').showModal();
 }
 async function setStatus(id, status) {
@@ -407,41 +398,12 @@ $('#quote-status-select').addEventListener('change', async (e) => {
 const signature = () => [company.company_name, company.phone && 'Tel: ' + company.phone, company.email].filter(Boolean).join('\n');
 $('#b-download-pdf').addEventListener('click', () => {
   if (!active) return;
-  
-  toast('Generando PDF...');
-
-  // 1. Creamos un contenedor temporal invisible fuera del diálogo
-  const container = document.createElement('div');
-  container.style.position = 'fixed';
-  container.style.left = '-9999px';
-  container.style.top = '0';
-  container.style.width = '794px'; // Ancho exacto estándar para A4 a 96 DPI
-  container.style.background = '#ffffff';
-  container.style.padding = '30px';
-  container.style.boxSizing = 'border-box';
-  
-  // 2. Copiamos exactamente el HTML del presupuesto actual
-  container.innerHTML = $('#pdf-printable-area').innerHTML;
-  document.body.appendChild(container);
-
-  // 3. Generamos el PDF desde el contenedor clonado y limpio
-  html2pdf().from(container).set({
-    margin: 10, 
-    filename: `Presupuesto_${active.code}.pdf`, 
-    image: { type: 'jpeg', quality: 0.98 },
-    html2canvas: { 
-      scale: 2, 
-      useCORS: true, 
-      scrollX: 0, 
-      scrollY: 0,
-      windowWidth: 794 
-    },
-    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }, 
-    pagebreak: { mode: ['css', 'legacy'], avoid: 'tr' },
-  }).save().then(() => {
-    // 4. Limpiamos el elemento temporal al terminar
-    document.body.removeChild(container);
-  });
+  html2pdf().from($('#pdf-printable-area')).set({
+    margin: 10, filename: `Presupuesto_${active.code}.pdf`, image: { type: 'jpeg', quality: 0.98 },
+    html2canvas: { scale: 2, useCORS: true, scrollX: 0, scrollY: 0 },
+    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }, pagebreak: { mode: ['css', 'legacy'], avoid: 'tr' },
+  }).save();
+  toast('Descargando PDF...');
 });
 $('#b-send-whatsapp').addEventListener('click', async () => {
   if (!active || !digits(active.phone)) return toast('El cliente no tiene un teléfono válido.', true);
