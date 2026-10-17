@@ -410,27 +410,38 @@ $('#b-download-pdf').addEventListener('click', () => {
   
   toast('Generando PDF...');
 
-  // Damos un pequeño respiro de 150ms para que el navegador estabilice 
-  // el renderizado del modal, ya sea abierto desde el Dashboard o el Historial
-  setTimeout(() => {
-    const element = $('#pdf-printable-area');
+  // 1. Creamos un contenedor temporal invisible fuera del diálogo
+  const container = document.createElement('div');
+  container.style.position = 'fixed';
+  container.style.left = '-9999px';
+  container.style.top = '0';
+  container.style.width = '794px'; // Ancho exacto estándar para A4 a 96 DPI
+  container.style.background = '#ffffff';
+  container.style.padding = '30px';
+  container.style.boxSizing = 'border-box';
+  
+  // 2. Copiamos exactamente el HTML del presupuesto actual
+  container.innerHTML = $('#pdf-printable-area').innerHTML;
+  document.body.appendChild(container);
 
-    html2pdf().from(element).set({
-      margin: 10, 
-      filename: `Presupuesto_${active.code}.pdf`, 
-      image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { 
-        scale: 2, 
-        useCORS: true, 
-        scrollX: 0, 
-        scrollY: 0,
-        // Forzamos un ancho de ventana virtual fijo para evitar recortes aleatorios
-        windowWidth: 800 
-      },
-      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }, 
-      pagebreak: { mode: ['css', 'legacy'], avoid: 'tr' },
-    }).save();
-  }, 150);
+  // 3. Generamos el PDF desde el contenedor clonado y limpio
+  html2pdf().from(container).set({
+    margin: 10, 
+    filename: `Presupuesto_${active.code}.pdf`, 
+    image: { type: 'jpeg', quality: 0.98 },
+    html2canvas: { 
+      scale: 2, 
+      useCORS: true, 
+      scrollX: 0, 
+      scrollY: 0,
+      windowWidth: 794 
+    },
+    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }, 
+    pagebreak: { mode: ['css', 'legacy'], avoid: 'tr' },
+  }).save().then(() => {
+    // 4. Limpiamos el elemento temporal al terminar
+    document.body.removeChild(container);
+  });
 });
 $('#b-send-whatsapp').addEventListener('click', async () => {
   if (!active || !digits(active.phone)) return toast('El cliente no tiene un teléfono válido.', true);
