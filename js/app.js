@@ -343,37 +343,99 @@ function pdfHtml(q, ls) {
   const t = calcTotals(ls, +q.iva_pct);
   const c = q.clients || {};
   const d = (x) => new Date(x).toLocaleDateString('es-ES');
-  const td = 'padding:8px;border-bottom:1px solid #E3ECE6;';
-  const rows = ls.map((l, i) => `<tr><td style="${td}"><strong>${esc(l.service_name)}</strong></td>
-    <td style="${td}text-align:center">${l.unit === '%' ? '—' : l.qty + ' ' + esc(l.unit)}</td>
-    <td style="${td}text-align:right">${priceLabel(l)}</td><td style="${td}text-align:right"><strong>${eur(t.amounts[i])}</strong></td></tr>`).join('');
-  const contact = [company.phone && 'Tel: ' + company.phone, company.email].filter(Boolean).map(esc).join(' · ');
-  const line = (a, b, s = '') => `<div style="display:flex;justify-content:space-between;padding:4px 0;${s}"><span>${a}</span><span>${b}</span></div>`;
+  const td = 'padding: 10px 12px; border-bottom: 1px solid #EAEFEA; font-size: 12px; color: #163D2D;';
+  
+  const rows = ls.map((l, i) => `
+    <tr>
+      <td style="${td}">
+        <strong style="color: #164B38;">${esc(l.service_name)}</strong>
+      </td>
+      <td style="${td} text-align: center; color: #4A6A5A;">${l.unit === '%' ? '—' : l.qty + ' ' + esc(l.unit)}</td>
+      <td style="${td} text-align: right; color: #4A6A5A;">${priceLabel(l)}</td>
+      <td style="${td} text-align: right; font-weight: 600;">${eur(t.amounts[i])}</td>
+    </tr>
+  `).join('');
+
+  const contact = [company.phone && 'Tel: ' + company.phone, company.email].filter(Boolean).map(esc).join('  ·  ');
+  const line = (a, b, s = '') => `<div style="display: flex; justify-content: space-between; padding: 4px 0; font-size: 12px; color: #4A6A5A; ${s}"><span>${a}</span><span>${b}</span></div>`;
 
   return `
-  <div style="display:flex;flex-direction:column;justify-content:space-between;min-height:250mm;box-sizing:border-box;">
+  <div style="display: flex; flex-direction: column; justify-content: space-between; width: 100%; min-height: 255mm; box-sizing: border-box; font-family: 'Inter', system-ui, -apple-system, sans-serif; background: #ffffff; color: #163D2D; padding: 10px 5px;">
+    
+    <!-- CABECERA Y CUERPO -->
     <div>
-      <div style="display:flex;justify-content:space-between;border-bottom:2px solid #164B38;padding-bottom:15px;margin-bottom:20px">
-        <div><h1 style="color:#164B38;font-size:22px;margin:0">${esc(company.company_name || 'Presupuesto')}</h1>
-          <p style="margin:6px 0 0;font-size:11px;color:#4A6A5A">${contact}</p></div>
-        <div style="text-align:right"><strong style="font-size:18px;color:#164B38">${quoteCode(q.quote_no)}</strong><br>
-          <span style="font-size:12px;color:#4A6A5A">Fecha: ${d(q.created_at)}${q.valid_until ? '<br>Válido hasta: ' + d(q.valid_until) : ''}</span></div>
+      <!-- HEADER CON ACENTO MARCA -->
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #164B38; padding-bottom: 18px; margin-bottom: 24px;">
+        <div>
+          <h1 style="color: #164B38; font-size: 24px; font-weight: 800; letter-spacing: -0.5px; margin: 0 0 6px 0; text-transform: uppercase;">${esc(company.company_name || 'ALMANORTE')}</h1>
+          <p style="margin: 0; font-size: 11px; color: #4A6A5A; font-weight: 500;">${contact}</p>
+        </div>
+        <div style="text-align: right;">
+          <div style="display: inline-block; background: #E3F1E8; padding: 4px 10px; border-radius: 4px; color: #164B38; font-weight: 700; font-size: 14px; margin-bottom: 6px;">
+            ${quoteCode(q.quote_no)}
+          </div>
+          <p style="margin: 0; font-size: 11px; color: #4A6A5A;"><strong>Fecha:</strong> ${d(q.created_at)}</p>
+          ${q.valid_until ? `<p style="margin: 2px 0 0 0; font-size: 11px; color: #4A6A5A;"><strong>Validez:</strong> ${d(q.valid_until)}</p>` : ''}
+        </div>
       </div>
-      <div style="margin-bottom:20px;font-size:13px;background:#f8fbf9;padding:12px;border-radius:6px;border:1px solid #BFD3C6">
-        <strong style="color:#164B38">DATOS DEL CLIENTE</strong><br><span style="font-weight:600">${esc(c.name || 'Cliente')}</span><br>
-        ${esc(c.phone || '')}${c.locality ? ' | ' + esc(c.locality) : ''}</div>
-      <table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:20px"><thead><tr style="background:#E3F1E8;color:#164B38">
-        <th style="padding:8px;text-align:left">Concepto / Servicio</th><th style="padding:8px;width:90px">Cant.</th>
-        <th style="padding:8px;text-align:right;width:90px">Precio</th><th style="padding:8px;text-align:right;width:90px">Total</th></tr></thead><tbody>${rows}</tbody></table>
-      <div style="display:flex;justify-content:flex-end"><div style="width:250px;font-size:13px;color:#4A6A5A">
-        ${line('Base imponible:', eur(t.subtotal))}${line(`IVA (${+q.iva_pct}%):`, eur(t.tax))}
-        ${line('TOTAL:', eur(t.total), 'border-top:2px solid #164B38;font-weight:bold;color:#164B38;font-size:15px;margin-top:4px;padding-top:6px')}</div></div>
-      ${q.notes ? `<p style="margin-top:20px;font-size:12px"><strong>Observaciones:</strong> ${esc(q.notes)}</p>` : ''}
+
+      <!-- BLOQUE DE DATOS DE CLIENTE -->
+      <div style="display: flex; justify-content: space-between; gap: 20px; background: #F8FBF9; border: 1px solid #D1E2D7; border-radius: 8px; padding: 14px 16px; margin-bottom: 28px;">
+        <div style="flex: 1;">
+          <span style="font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: #2D6A4F; display: block; margin-bottom: 4px;">Cliente</span>
+          <strong style="font-size: 14px; color: #164B38; display: block;">${esc(c.name || 'Cliente')}</strong>
+          <span style="font-size: 12px; color: #4A6A5A;">${esc(c.phone || '')}${c.locality ? ' · ' + esc(c.locality) : ''}</span>
+        </div>
+      </div>
+
+      <!-- TABLA DE CONCEPTOS -->
+      <table style="width: 100%; border-collapse: collapse; margin-bottom: 24px;">
+        <thead>
+          <tr style="background: #164B38; color: #ffffff;">
+            <th style="padding: 9px 12px; text-align: left; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; border-radius: 4px 0 0 4px;">Concepto / Servicio</th>
+            <th style="padding: 9px 12px; text-align: center; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; width: 80px;">Cant.</th>
+            <th style="padding: 9px 12px; text-align: right; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; width: 90px;">Precio</th>
+            <th style="padding: 9px 12px; text-align: right; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; width: 90px; border-radius: 0 4px 4px 0;">Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows}
+        </tbody>
+      </table>
+
+      <!-- DESGLOSE TOTALES -->
+      <div style="display: flex; justify-content: flex-end; margin-bottom: 20px;">
+        <div style="width: 240px; background: #F8FBF9; border: 1px solid #D1E2D7; border-radius: 8px; padding: 12px 14px;">
+          ${line('Base imponible', eur(t.subtotal))}
+          ${line(`IVA (${+q.iva_pct}%)`, eur(t.tax))}
+          <div style="border-top: 1.5px solid #164B38; margin-top: 6px; padding-top: 6px; display: flex; justify-content: space-between; align-items: center;">
+            <strong style="font-size: 13px; color: #164B38;">TOTAL</strong>
+            <strong style="font-size: 17px; color: #164B38;">${eur(t.total)}</strong>
+          </div>
+        </div>
+      </div>
+
+      ${q.notes ? `
+        <div style="background: #FFFDF5; border-left: 3px solid #D9A400; padding: 10px 12px; border-radius: 0 6px 6px 0; margin-top: 16px;">
+          <strong style="font-size: 11px; color: #856404; display: block; margin-bottom: 2px;">Observaciones:</strong>
+          <span style="font-size: 11px; color: #555555;">${esc(q.notes)}</span>
+        </div>
+      ` : ''}
     </div>
 
-    <div style="margin-top:auto;padding-top:15px;">
-      ${company.terms ? `<div style="padding-top:10px;border-top:1px solid #E3ECE6;font-size:9px;line-height:1.3;color:#6C8577;">${esc(company.terms)}</div>` : ''}
+    <!-- PIE DE PÁGINA FIX EN EL FONDO -->
+    <div style="margin-top: auto; padding-top: 16px; border-top: 1px solid #EAEFEA;">
+      ${company.terms ? `
+        <p style="font-size: 8.5px; line-height: 1.4; color: #6C8577; margin: 0; text-align: justify;">
+          <strong>Condiciones del presupuesto:</strong> ${esc(company.terms)}
+        </p>
+      ` : ''}
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px; font-size: 8.5px; color: #9CC5AE;">
+        <span>Documento generado digitalmente por AlmaGest</span>
+        <span>Página 1 de 1</span>
+      </div>
     </div>
+
   </div>`;
 }
 async function openQuotePreview(id) {
@@ -406,11 +468,24 @@ $('#quote-status-select').addEventListener('change', async (e) => {
 const signature = () => [company.company_name, company.phone && 'Tel: ' + company.phone, company.email].filter(Boolean).join('\n');
 $('#b-download-pdf').addEventListener('click', () => {
   if (!active) return;
-  html2pdf().from($('#pdf-printable-area')).set({
-    margin: 10, filename: `Presupuesto_${active.code}.pdf`, image: { type: 'jpeg', quality: 0.98 },
-    html2canvas: { scale: 2, useCORS: true, scrollX: 0, scrollY: 0 },
-    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }, pagebreak: { mode: ['css', 'legacy'], avoid: 'tr' },
-  }).save();
+  
+  const element = $('#pdf-printable-area');
+  
+  const opt = {
+    margin: [12, 12, 12, 12], // Márgenes limpios de 12mm en todos los lados
+    filename: `Presupuesto_${active.code}.pdf`,
+    image: { type: 'jpeg', quality: 0.98 },
+    html2canvas: { 
+      scale: 2, 
+      useCORS: true, 
+      logging: false,
+      windowWidth: 794 // Ancho estándar A4 a 96dpi para evitar cortes horizontales
+    },
+    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+    pagebreak: { mode: ['css', 'legacy'] }
+  };
+
+  html2pdf().set(opt).from(element).save();
   toast('Descargando PDF...');
 });
 $('#b-send-whatsapp').addEventListener('click', async () => {
