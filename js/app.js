@@ -409,11 +409,30 @@ $('#quote-status-select').addEventListener('change', async (e) => {
 const signature = () => [company.company_name, company.phone && 'Tel: ' + company.phone, company.email].filter(Boolean).join('\n');
 $('#b-download-pdf').addEventListener('click', () => {
   if (!active) return;
-  html2pdf().from($('#pdf-printable-area')).set({
-    margin: 10, filename: `Presupuesto_${active.code}.pdf`, image: { type: 'jpeg', quality: 0.98 },
-    html2canvas: { scale: 2, useCORS: true, scrollX: 0, scrollY: 0 },
-    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }, pagebreak: { mode: ['css', 'legacy'], avoid: 'tr' },
-  }).save();
+  
+  const element = $('#pdf-printable-area');
+  
+  // Guardamos los estilos originales para restaurarlos después
+  const originalWidth = element.style.width;
+  const originalMaxWidth = element.style.maxWidth;
+  
+  // Forzamos un ancho fijo seguro para la renderización de html2pdf
+  element.style.width = '700px';
+  element.style.maxWidth = '700px';
+
+  html2pdf().from(element).set({
+    margin: 10, 
+    filename: `Presupuesto_${active.code}.pdf`, 
+    image: { type: 'jpeg', quality: 0.98 },
+    html2canvas: { scale: 2, useCORS: true, scrollX: 0, scrollY: 0, windowWidth: 700 },
+    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }, 
+    pagebreak: { mode: ['css', 'legacy'], avoid: 'tr' },
+  }).save().then(() => {
+    // Restauramos los estilos originales del contenedor en pantalla
+    element.style.width = originalWidth;
+    element.style.maxWidth = originalMaxWidth;
+  });
+
   toast('Descargando PDF...');
 });
 $('#b-send-whatsapp').addEventListener('click', async () => {
