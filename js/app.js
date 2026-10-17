@@ -349,24 +349,32 @@ function pdfHtml(q, ls) {
     <td style="${td}text-align:right">${priceLabel(l)}</td><td style="${td}text-align:right"><strong>${eur(t.amounts[i])}</strong></td></tr>`).join('');
   const contact = [company.phone && 'Tel: ' + company.phone, company.email].filter(Boolean).map(esc).join(' · ');
   const line = (a, b, s = '') => `<div style="display:flex;justify-content:space-between;padding:4px 0;${s}"><span>${a}</span><span>${b}</span></div>`;
+
   return `
-  <div style="display:flex;justify-content:space-between;border-bottom:2px solid #164B38;padding-bottom:15px;margin-bottom:20px">
-    <div><h1 style="color:#164B38;font-size:22px;margin:0">${esc(company.company_name || 'Presupuesto')}</h1>
-      <p style="margin:6px 0 0;font-size:11px;color:#4A6A5A">${contact}</p></div>
-    <div style="text-align:right"><strong style="font-size:18px;color:#164B38">${quoteCode(q.quote_no)}</strong><br>
-      <span style="font-size:12px;color:#4A6A5A">Fecha: ${d(q.created_at)}${q.valid_until ? '<br>Válido hasta: ' + d(q.valid_until) : ''}</span></div>
-  </div>
-  <div style="margin-bottom:20px;font-size:13px;background:#f8fbf9;padding:12px;border-radius:6px;border:1px solid #BFD3C6">
-    <strong style="color:#164B38">DATOS DEL CLIENTE</strong><br><span style="font-weight:600">${esc(c.name || 'Cliente')}</span><br>
-    ${esc(c.phone || '')}${c.locality ? ' | ' + esc(c.locality) : ''}</div>
-  <table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:20px"><thead><tr style="background:#E3F1E8;color:#164B38">
-    <th style="padding:8px;text-align:left">Concepto / Servicio</th><th style="padding:8px;width:90px">Cant.</th>
-    <th style="padding:8px;text-align:right;width:90px">Precio</th><th style="padding:8px;text-align:right;width:90px">Total</th></tr></thead><tbody>${rows}</tbody></table>
-  <div style="display:flex;justify-content:flex-end"><div style="width:250px;font-size:13px;color:#4A6A5A">
-    ${line('Base imponible:', eur(t.subtotal))}${line(`IVA (${+q.iva_pct}%):`, eur(t.tax))}
-    ${line('TOTAL:', eur(t.total), 'border-top:2px solid #164B38;font-weight:bold;color:#164B38;font-size:15px;margin-top:4px;padding-top:6px')}</div></div>
-  ${q.notes ? `<p style="margin-top:20px;font-size:12px"><strong>Observaciones:</strong> ${esc(q.notes)}</p>` : ''}
-  ${company.terms ? `<div style="margin-top:30px;padding-top:10px;border-top:1px solid #E3ECE6;font-size:9px;line-height:1.3;color:#6C8577;">${esc(company.terms)}</div>` : ''}`;
+  <div style="display:flex;flex-direction:column;justify-content:space-between;min-height:250mm;box-sizing:border-box;">
+    <div>
+      <div style="display:flex;justify-content:space-between;border-bottom:2px solid #164B38;padding-bottom:15px;margin-bottom:20px">
+        <div><h1 style="color:#164B38;font-size:22px;margin:0">${esc(company.company_name || 'Presupuesto')}</h1>
+          <p style="margin:6px 0 0;font-size:11px;color:#4A6A5A">${contact}</p></div>
+        <div style="text-align:right"><strong style="font-size:18px;color:#164B38">${quoteCode(q.quote_no)}</strong><br>
+          <span style="font-size:12px;color:#4A6A5A">Fecha: ${d(q.created_at)}${q.valid_until ? '<br>Válido hasta: ' + d(q.valid_until) : ''}</span></div>
+      </div>
+      <div style="margin-bottom:20px;font-size:13px;background:#f8fbf9;padding:12px;border-radius:6px;border:1px solid #BFD3C6">
+        <strong style="color:#164B38">DATOS DEL CLIENTE</strong><br><span style="font-weight:600">${esc(c.name || 'Cliente')}</span><br>
+        ${esc(c.phone || '')}${c.locality ? ' | ' + esc(c.locality) : ''}</div>
+      <table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:20px"><thead><tr style="background:#E3F1E8;color:#164B38">
+        <th style="padding:8px;text-align:left">Concepto / Servicio</th><th style="padding:8px;width:90px">Cant.</th>
+        <th style="padding:8px;text-align:right;width:90px">Precio</th><th style="padding:8px;text-align:right;width:90px">Total</th></tr></thead><tbody>${rows}</tbody></table>
+      <div style="display:flex;justify-content:flex-end"><div style="width:250px;font-size:13px;color:#4A6A5A">
+        ${line('Base imponible:', eur(t.subtotal))}${line(`IVA (${+q.iva_pct}%):`, eur(t.tax))}
+        ${line('TOTAL:', eur(t.total), 'border-top:2px solid #164B38;font-weight:bold;color:#164B38;font-size:15px;margin-top:4px;padding-top:6px')}</div></div>
+      ${q.notes ? `<p style="margin-top:20px;font-size:12px"><strong>Observaciones:</strong> ${esc(q.notes)}</p>` : ''}
+    </div>
+
+    <div style="margin-top:auto;padding-top:15px;">
+      ${company.terms ? `<div style="padding-top:10px;border-top:1px solid #E3ECE6;font-size:9px;line-height:1.3;color:#6C8577;">${esc(company.terms)}</div>` : ''}
+    </div>
+  </div>`;
 }
 async function openQuotePreview(id) {
   const { data: q, error } = await db.from('quotes').select('*, clients(*)').eq('id', id).single();
