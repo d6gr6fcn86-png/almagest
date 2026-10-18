@@ -161,20 +161,62 @@ input[type=checkbox] { width: auto; min-height: 0; padding: 0; }
   gap: 20px;
   flex-shrink: 0;
 }
-.sidebar-section {
+
+/* Estilos para el Menú en Árbol Lateral */
+.tree-menu {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 12px;
 }
-.sidebar-title {
+
+.tree-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.tree-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  cursor: pointer;
+  user-select: none;
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: .5px;
   color: var(--muted);
-  padding: 0 8px;
-  margin-bottom: 4px;
   font-weight: 600;
+  border-radius: 4px;
 }
+
+.tree-header:hover {
+  background: var(--tint);
+  color: var(--primary);
+}
+
+.tree-toggle-icon {
+  font-family: monospace;
+  font-weight: bold;
+  font-size: 12px;
+  width: 18px;
+  color: var(--primary);
+}
+
+.tree-children {
+  display: none;
+  flex-direction: column;
+  gap: 4px;
+  padding-left: 12px;
+  border-left: 1px dashed var(--border);
+  margin-left: 10px;
+  margin-top: 2px;
+}
+
+.tree-group.open .tree-children {
+  display: flex;
+}
+
 .nav-btn {
   background: none;
   border: 0;
@@ -186,6 +228,7 @@ input[type=checkbox] { width: auto; min-height: 0; padding: 0; }
   border-radius: 6px;
   cursor: pointer;
   transition: background .15s ease;
+  width: 100%;
 }
 .nav-btn:hover {
   background: var(--tint);
@@ -373,8 +416,9 @@ dialog::backdrop { background: #0006; }
     overflow-x: auto;
     padding: 10px;
   }
-  .sidebar-section { flex-direction: row; }
-  .sidebar-title { display: none; }
+  .tree-menu { flex-direction: row; gap: 15px; }
+  .tree-children { display: flex !important; border-left: none; padding-left: 0; margin-left: 0; }
+  .tree-toggle-icon { display: none; }
   .bar { flex-direction: column; align-items: stretch; }
   .filter-funnel-wrapper { width: 100%; }
 }
