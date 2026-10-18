@@ -408,3 +408,11 @@ dialog::backdrop { background: #0006; }
 @keyframes gIn { from { stroke-dasharray: 0 100; } }
 @keyframes grow { from { height: 0; } }
 @media (prefers-reduced-motion: reduce) { .g-fg, .bpair i { animation: none; } }
+
+/* Campana, tareas y acciones */
+.bell-wrap { position: relative; display: inline-flex; }
+#bell-count { position: absolute; top: -4px; right: -6px; background: #d62828; color: #fff; border-radius: 999px; font-size: 10px; font-weight: 700; padding: 1px 5px; pointer-events: none; }
+#bell-panel { position: absolute; right: 0; top: 36px; width: 340px; max-width: 90vw; background: #fff; color: var(--text); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 8px 24px #0003; z-index: 20; padding: 10px; }
+.task-chk { display: flex; flex-direction: row; align-items: center; gap: 10px; flex: 1; cursor: pointer; font-size: 13px; color: var(--text); }
+.task-done { text-decoration: line-through; color: var(--muted); }
+details.card summary { cursor: pointer; font-weight: 600; color: var(--brand); }
