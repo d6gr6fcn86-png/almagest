@@ -12,9 +12,10 @@ const KINDS = { particular: 'Particular', empresa: 'Empresa', comunidad: 'Comuni
 const STATUS_STYLE = {
   borrador: 'background:#fff3cd;color:#856404', emitido: 'background:#d1ecf1;color:#0c5460',
   aceptado: 'background:#d4edda;color:#155724', rechazado: 'background:#f8d7da;color:#721c24',
-  facturado: 'background:#e2e3e5;color:#383d41', caducado: 'background:#e2e3e5;color:#383d41',
+  pagado: 'background:#c3e6cb;color:#0b3d1e', facturado: 'background:#e2e3e5;color:#383d41', caducado: 'background:#e2e3e5;color:#383d41',
 };
 const fmt = new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' });
+const statusLabel = (q) => (q.status === 'rechazado' && q.closed_reason ? 'RECHAZADO (SIN RESPUESTA)' : q.status.toUpperCase());
 const eur = (n) => fmt.format(n);
 const round2 = (n) => Math.round((n + Number.EPSILON) * 100) / 100;
 const priceLabel = (l) => (l.unit === '%' ? `${Number(l.unit_price)} %` : eur(l.unit_price));
@@ -52,7 +53,7 @@ function toast(msg, isErr = false) {
 }
 
 /* ---------- Datos de empresa (tabla settings) ---------- */
-let company = { company_name: '', phone: '', email: '', iva_pct: 21, valid_days: 30, terms: '' };
+let company = { company_name: '', phone: '', email: '', iva_pct: 21, valid_days: 30, terms: '', company_nif: '', company_address: '', contact1_days: 3, contact2_days: 6, close_days: 7 };
 async function loadCompany() {
   const { data } = await db.from('settings').select('*').maybeSingle();
   if (data) company = { ...company, ...data };
@@ -62,20 +63,26 @@ document.body.insertAdjacentHTML('beforeend', `
 <dialog id="dlg-company"><form id="f-company"><h2>Datos de empresa</h2>
   <div class="grid">
     <label class="full">Nombre comercial / razón social<input name="company_name" maxlength="120"></label>
+    <label>NIF/CIF<input name="company_nif" maxlength="20"></label>
+    <label>Dirección<input name="company_address" maxlength="160"></label>
     <label>Teléfono<input name="phone" maxlength="25"></label>
     <label>Correo<input name="email" type="email" maxlength="120"></label>
     <label>IVA (%)<input name="iva_pct" type="number" step="0.01" min="0" max="100" required></label>
     <label>Validez del presupuesto (días)<input name="valid_days" type="number" step="1" min="1" max="365" required></label>
     <label>Avisar si no responden en (días)<input name="followup_days" type="number" step="1" min="1" max="90" required></label>
+    <label>Seguimiento: contacto 1 (día)<input name="contact1_days" type="number" step="1" min="1" max="60" required></label>
+    <label>Seguimiento: contacto 2 (día)<input name="contact2_days" type="number" step="1" min="1" max="60" required></label>
+    <label>Archivar sin respuesta (día)<input name="close_days" type="number" step="1" min="1" max="60" required></label>
     <label class="full">Condiciones (pie del presupuesto)<textarea name="terms" rows="3" maxlength="600"></textarea></label>
   </div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"><button id="b-export" class="btn ghost" type="button">Exportar todos los datos</button><button id="b-pass" class="btn ghost" type="button">Cambiar contraseña</button></div>
   <p id="d-company-err" class="error" hidden></p>
   <div class="actions"><button id="d-company-cancel" class="btn ghost" type="button">Cancelar</button><button class="btn" type="submit">Guardar</button></div>
 </form></dialog>`);
 $('.sidebar-section').insertAdjacentHTML('beforeend', '<button class="nav-btn" id="b-company" type="button">Datos de empresa</button>');
 $('#b-company').addEventListener('click', () => {
   const f = $('#f-company');
-  for (const k of ['company_name', 'phone', 'email', 'iva_pct', 'valid_days', 'followup_days', 'terms']) f.elements[k].value = company[k] ?? '';
+  for (const k of ['company_name', 'company_nif', 'company_address', 'phone', 'email', 'iva_pct', 'valid_days', 'followup_days', 'contact1_days', 'contact2_days', 'close_days', 'terms']) f.elements[k].value = company[k] ?? '';
   $('#d-company-err').hidden = true;
   $('#dlg-company').showModal();
 });
@@ -84,10 +91,12 @@ $('#f-company').addEventListener('submit', async (e) => {
   e.preventDefault();
   const f = e.target;
   const v = {
-    company_name: f.elements.company_name.value.trim() || null, phone: f.elements.phone.value.trim() || null,
+    company_name: f.elements.company_name.value.trim() || null, company_nif: f.elements.company_nif.value.trim() || null, company_address: f.elements.company_address.value.trim() || null, phone: f.elements.phone.value.trim() || null,
     email: f.elements.email.value.trim() || null, terms: f.elements.terms.value.trim() || null,
     iva_pct: parseFloat(f.elements.iva_pct.value), valid_days: parseInt(f.elements.valid_days.value, 10), followup_days: parseInt(f.elements.followup_days.value, 10),
+    contact1_days: parseInt(f.elements.contact1_days.value, 10), contact2_days: parseInt(f.elements.contact2_days.value, 10), close_days: parseInt(f.elements.close_days.value, 10),
   };
+  if (!(v.contact1_days < v.contact2_days && v.contact2_days <= v.close_days)) { $('#d-company-err').textContent = 'Los días del seguimiento deben ir en orden: contacto 1 < contacto 2 ≤ archivar.'; $('#d-company-err').hidden = false; return; }
   const { data: ex } = await db.from('settings').select('org_id').maybeSingle();
   const { error } = ex ? await db.from('settings').update(v).eq('org_id', ex.org_id) : await db.from('settings').insert(v);
   if (error) { $('#d-company-err').textContent = error.message; $('#d-company-err').hidden = false; return; }
@@ -317,7 +326,7 @@ async function loadHistory() {
   $('#rows-history').innerHTML = data.map((x) => `<tr>
     <td><strong>${quoteCode(x.quote_no)}</strong></td><td>${new Date(x.created_at).toLocaleDateString('es-ES')}</td>
     <td><a href="#" class="link" data-client="${esc(x.client_id)}" title="Abrir ficha del cliente"><strong>${esc(x.clients?.name || 'Cliente')}</strong></a></td>
-    <td><span style="padding:3px 8px;border-radius:4px;font-size:11px;font-weight:600;${STATUS_STYLE[x.status] || ''}">${esc(x.status.toUpperCase())}</span></td>
+    <td><span style="padding:3px 8px;border-radius:4px;font-size:11px;font-weight:600;${STATUS_STYLE[x.status] || ''}">${esc(statusLabel(x))}</span></td>
     <td><strong>${eur(x.total)}</strong></td>
     <td><button class="btn ghost" type="button" data-open="${esc(x.id)}" style="padding:4px 10px;font-size:12px">Ver / Enviar PDF</button></td></tr>`).join('');
 }
@@ -347,12 +356,13 @@ function pdfHtml(q, ls) {
   const rows = ls.map((l, i) => `<tr><td style="${td}"><strong>${esc(l.service_name)}</strong></td>
     <td style="${td}text-align:center">${l.unit === '%' ? '—' : l.qty + ' ' + esc(l.unit)}</td>
     <td style="${td}text-align:right">${priceLabel(l)}</td><td style="${td}text-align:right"><strong>${eur(t.amounts[i])}</strong></td></tr>`).join('');
+  const idLine = [company.company_nif && 'NIF/CIF: ' + company.company_nif, company.company_address].filter(Boolean).map(esc).join(' · ');
   const contact = [company.phone && 'Tel: ' + company.phone, company.email].filter(Boolean).map(esc).join(' · ');
   const line = (a, b, s = '') => `<div style="display:flex;justify-content:space-between;padding:4px 0;${s}"><span>${a}</span><span>${b}</span></div>`;
   return `
   <div style="display:flex;justify-content:space-between;border-bottom:2px solid #164B38;padding-bottom:15px;margin-bottom:20px">
     <div><h1 style="color:#164B38;font-size:22px;margin:0">${esc(company.company_name || 'Presupuesto')}</h1>
-      <p style="margin:6px 0 0;font-size:11px;color:#4A6A5A">${contact}</p></div>
+      <p style="margin:6px 0 0;font-size:11px;color:#4A6A5A">${idLine}${idLine && contact ? '<br>' : ''}${contact}</p></div>
     <div style="text-align:right"><strong style="font-size:18px;color:#164B38">${quoteCode(q.quote_no)}</strong><br>
       <span style="font-size:12px;color:#4A6A5A">Fecha: ${d(q.created_at)}${q.valid_until ? '<br>Válido hasta: ' + d(q.valid_until) : ''}</span></div>
   </div>
@@ -373,15 +383,17 @@ async function openQuotePreview(id) {
   if (error || !q) return toast('No se pudo cargar el presupuesto', true);
   const { data: ls, error: lErr } = await db.from('quote_lines').select('*').eq('quote_id', id).order('pos');
   if (lErr) return toast('No se pudieron cargar las líneas: ' + lErr.message, true);
-  active = { id, code: quoteCode(q.quote_no), name: q.clients?.name || 'Cliente', phone: q.clients?.phone || '', email: q.clients?.email || '', total: Number(q.total) };
+  active = { id, q, ls, code: quoteCode(q.quote_no), name: q.clients?.name || 'Cliente', phone: q.clients?.phone || '', email: q.clients?.email || '', total: Number(q.total) };
   $('#preview-modal-title').textContent = `Presupuesto ${active.code}`;
   $('#quote-status-select').value = q.status;
+  renderQuoteActions(q);
   $('#pdf-printable-area').innerHTML = pdfHtml(q, ls);
-  $('#dlg-quote-preview').showModal();
+  if (!$('#dlg-quote-preview').open) $('#dlg-quote-preview').showModal();
 }
 async function setStatus(id, status) {
-  const patch = { status };
-  if (status === 'emitido') patch.sent_at = new Date().toISOString(); // base de las alertas «sin respuesta»
+  const patch = { status, closed_reason: null, closed_at: null };
+  if (status === 'pagado') patch.paid_at = new Date().toISOString();
+  if (status === 'emitido') { patch.sent_at = new Date().toISOString(); patch.paused_until = null; } // base de las alertas «sin respuesta»
   const { error } = await db.from('quotes').update(patch).eq('id', id);
   if (error) { toast('No se pudo actualizar el estado: ' + error.message, true); return false; }
   return true;
@@ -429,7 +441,7 @@ function dashStats(monthRows, pendingRows, now, validDays, followDays) {
     const a = new Date(now.getFullYear(), now.getMonth() + offset, 1);
     const b = new Date(now.getFullYear(), now.getMonth() + offset + 1, 1);
     const sent = monthRows.filter((q) => q.status !== 'borrador' && ref(q) >= a && ref(q) < b);
-    const acc = sent.filter((q) => q.status === 'aceptado' || q.status === 'facturado');
+    const acc = sent.filter((q) => q.status === 'aceptado' || q.status === 'facturado' || q.status === 'pagado');
     return { label: new Intl.DateTimeFormat('es-ES', { month: 'short' }).format(a).replace('.', ''), sent, acc, sentTotal: sum(sent), accTotal: sum(acc) };
   };
   const series = [-5, -4, -3, -2, -1, 0].map(bucket);
@@ -466,7 +478,7 @@ async function loadDashboard() {
   const now = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
   const since = new Date(now.getFullYear(), now.getMonth() - 5, 1).toISOString();
-  const cols = 'id, quote_no, status, total, created_at, sent_at, clients(name)';
+  const cols = 'id, quote_no, status, total, created_at, sent_at, closed_reason, clients(name)';
   const [month, pending, recent, drafts, newClients] = await Promise.all([
     db.from('quotes').select(cols).or(`sent_at.gte.${since},created_at.gte.${since}`).limit(1000),
     db.from('quotes').select(cols).eq('status', 'emitido').limit(500),
@@ -514,7 +526,7 @@ async function loadDashboard() {
   if (nDrafts) att += `<p class="muted" style="margin-top:12px">📌 ${nDrafts} borrador${nDrafts > 1 ? 'es' : ''} sin enviar</p>`;
   if (!att) att = '<p class="muted">Todo al día: no hay presupuestos pendientes de seguimiento.</p>';
   const last = recent.data.length
-    ? '<ul class="att-list">' + recent.data.map((q) => item(q, 'ok', `<span style="padding:2px 7px;border-radius:4px;font-size:11px;font-weight:600;${STATUS_STYLE[q.status] || ''}">${esc(q.status.toUpperCase())}</span> <strong>${eur(q.total)}</strong>`)).join('') + '</ul>'
+    ? '<ul class="att-list">' + recent.data.map((q) => item(q, 'ok', `<span style="padding:2px 7px;border-radius:4px;font-size:11px;font-weight:600;${STATUS_STYLE[q.status] || ''}">${esc(statusLabel(q))}</span> <strong>${eur(q.total)}</strong>`)).join('') + '</ul>'
     : '<p class="muted">Aún no hay presupuestos.</p>';
 
   $('#dash').innerHTML = `
@@ -532,12 +544,199 @@ $('#dash').addEventListener('click', (e) => { const o = e.target.closest('[data-
 $('#dash').addEventListener('keydown', (e) => { const o = e.key === 'Enter' && e.target.closest('[data-open]'); if (o) openQuotePreview(o.dataset.open); });
 $('#dlg-quote-preview').addEventListener('close', () => { if (!$('#sec-inicio').hidden) loadDashboard(); });
 
+/* ---------- Tareas y agenda, campana y acciones del seguimiento ---------- */
+const todayStr = () => new Intl.DateTimeFormat('sv-SE').format(new Date());
+const plusDays = (n) => { const d = new Date(); d.setDate(d.getDate() + n); return new Intl.DateTimeFormat('sv-SE').format(d); };
+const FOREVER = '2999-12-31';
+document.body.insertAdjacentHTML('beforeend', `
+<dialog id="dlg-task"><form id="f-task"><h2 id="d-task-title">Nueva tarea</h2>
+  <div class="grid"><label class="full">Tarea *<input name="title" required maxlength="160" placeholder="Ej. Llamar a Ana para cerrar el presupuesto"></label>
+  <label>Fecha<input name="due_date" type="date"></label></div>
+  <p id="d-task-err" class="error" hidden></p>
+  <div class="actions"><button id="d-task-delete" class="btn ghost red" type="button" hidden>Eliminar</button><span class="grow"></span>
+  <button id="d-task-cancel" class="btn ghost" type="button">Cancelar</button><button class="btn" type="submit">Guardar</button></div></form></dialog>
+<dialog id="dlg-pass"><form id="f-pass"><h2>Cambiar contraseña</h2>
+  <label>Contraseña nueva (mínimo 8 caracteres)<input name="p1" type="password" minlength="8" autocomplete="new-password" required></label>
+  <label style="margin-top:10px">Repite la contraseña<input name="p2" type="password" minlength="8" autocomplete="new-password" required></label>
+  <p id="d-pass-err" class="error" hidden></p>
+  <div class="actions"><button id="d-pass-cancel" class="btn ghost" type="button">Cancelar</button><button class="btn" type="submit">Guardar</button></div></form></dialog>`);
+
+let tasks = [];
+async function loadTasks() {
+  const { data, error } = await db.from('tasks').select('*, clients(name), quotes(quote_no)').order('due_date', { ascending: true }).limit(300);
+  if (error) return toast(error.message, true);
+  tasks = data;
+  const t = todayStr(), open = tasks.filter((x) => !x.done);
+  const groups = [['Vencidas', open.filter((x) => x.due_date && x.due_date < t), 'err'], ['Hoy', open.filter((x) => x.due_date === t), 'warn'],
+    ['Próximas', open.filter((x) => x.due_date > t), 'ok'], ['Sin fecha', open.filter((x) => !x.due_date), 'ok']];
+  const row = (x, cls) => `<li class="att ${cls}"><label class="task-chk"><input type="checkbox" data-done="${esc(x.id)}" ${x.done ? 'checked' : ''}><span class="${x.done ? 'task-done' : ''}">${esc(x.title)}</span></label>
+    <span class="muted">${x.due_date ? new Date(x.due_date + 'T00:00').toLocaleDateString('es-ES') : ''}${x.quotes ? ' · ' + quoteCode(x.quotes.quote_no) : ''} <button class="link" type="button" data-edit-task="${esc(x.id)}">Editar</button></span></li>`;
+  const done = tasks.filter((x) => x.done).sort((a, b) => (b.done_at || '').localeCompare(a.done_at || '')).slice(0, 10);
+  $('#task-list').innerHTML = (open.length
+    ? groups.filter((g) => g[1].length).map(([n, a, c]) => `<div class="card" style="margin-bottom:14px"><h3>${n} (${a.length})</h3><ul class="att-list">${a.map((x) => row(x, c)).join('')}</ul></div>`).join('')
+    : '<div class="card"><p class="muted">No tienes tareas pendientes. Pulsa «Nueva tarea» para añadir una.</p></div>')
+    + (done.length ? `<details class="card"><summary>Completadas recientemente (${done.length})</summary><ul class="att-list" style="margin-top:8px">${done.map((x) => row(x, 'ok')).join('')}</ul></details>` : '');
+}
+function openTaskDialog(x, preset = {}) {
+  const f = $('#f-task');
+  f.reset();
+  f.dataset.id = x ? x.id : '';
+  f.dataset.client = x?.client_id || preset.client_id || '';
+  f.dataset.quote = x?.quote_id || preset.quote_id || '';
+  f.elements.title.value = x ? x.title : preset.title || '';
+  f.elements.due_date.value = x ? x.due_date || '' : preset.due_date || todayStr();
+  $('#d-task-title').textContent = x ? 'Editar tarea' : 'Nueva tarea';
+  $('#d-task-delete').hidden = !x;
+  $('#d-task-err').hidden = true;
+  $('#dlg-task').showModal();
+}
+const reloadTasks = () => { if (!$('#sec-tareas').hidden) loadTasks(); refreshBell(); };
+$('#b-new-task').addEventListener('click', () => openTaskDialog(null));
+$('#d-task-cancel').addEventListener('click', () => $('#dlg-task').close());
+$('#task-list').addEventListener('click', (e) => { const b = e.target.closest('[data-edit-task]'); if (b) openTaskDialog(tasks.find((x) => x.id === b.dataset.editTask)); });
+$('#task-list').addEventListener('change', async (e) => {
+  const id = e.target.dataset.done;
+  if (!id) return;
+  const { error } = await db.from('tasks').update({ done: e.target.checked, done_at: e.target.checked ? new Date().toISOString() : null }).eq('id', id);
+  if (error) toast(error.message, true);
+  loadTasks(); refreshBell();
+});
+$('#f-task').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const f = e.target, id = f.dataset.id;
+  const v = { title: f.elements.title.value.trim(), due_date: f.elements.due_date.value || null };
+  if (!v.title) return;
+  if (!id) { v.client_id = f.dataset.client || null; v.quote_id = f.dataset.quote || null; }
+  const { error } = id ? await db.from('tasks').update(v).eq('id', id) : await db.from('tasks').insert(v);
+  if (error) { $('#d-task-err').textContent = error.message; $('#d-task-err').hidden = false; return; }
+  $('#dlg-task').close();
+  toast(id ? 'Tarea actualizada' : 'Tarea creada');
+  reloadTasks();
+});
+$('#d-task-delete').addEventListener('click', async () => {
+  const id = $('#f-task').dataset.id;
+  if (!id || !confirm('¿Eliminar esta tarea?')) return;
+  const { error } = await db.from('tasks').delete().eq('id', id);
+  if (error) return toast(error.message, true);
+  $('#dlg-task').close();
+  toast('Tarea eliminada');
+  reloadTasks();
+});
+
+/* Campana: tareas para hoy o vencidas + presupuestos archivados sin respuesta esta semana */
+async function refreshBell() {
+  const t = todayStr(), since = new Date(Date.now() - 7 * 864e5).toISOString();
+  const [tk, cl] = await Promise.all([
+    db.from('tasks').select('id,title,due_date').eq('done', false).lte('due_date', t).order('due_date').limit(20),
+    db.from('quotes').select('id,quote_no,valid_until,clients(name)').eq('status', 'rechazado').eq('closed_reason', 'sin_respuesta').gte('closed_at', since).order('closed_at', { ascending: false }).limit(20),
+  ]);
+  const T = tk.data || [], C = cl.data || [], n = T.length + C.length;
+  $('#bell-count').textContent = n > 9 ? '9+' : n;
+  $('#bell-count').hidden = !n;
+  document.title = (n ? `(${n}) ` : '') + 'AlmaGest';
+  const tl = T.slice(0, 6).map((x) => `<li class="att ${x.due_date < t ? 'err' : 'warn'}" data-bell-task="1" tabindex="0"><span>${esc(x.title)}</span></li>`).join('');
+  const cll = C.slice(0, 6).map((q) => `<li class="att err" data-open="${esc(q.id)}" tabindex="0"><span><strong>${quoteCode(q.quote_no)}</strong> · ${esc(q.clients?.name || 'Cliente')}</span><span>${q.valid_until >= t ? 'recuperable' : 'fuera de plazo'}</span></li>`).join('');
+  $('#bell-panel').innerHTML = n
+    ? (T.length ? `<h4 class="att-h warn">Tareas para hoy o vencidas (${T.length})</h4><ul class="att-list">${tl}</ul>` : '')
+      + (C.length ? `<h4 class="att-h err">Archivados sin respuesta (${C.length})</h4><ul class="att-list">${cll}</ul>` : '')
+    : '<p class="muted" style="margin:6px">Sin novedades.</p>';
+}
+$('#b-bell').addEventListener('click', (e) => { e.stopPropagation(); $('#bell-panel').hidden = !$('#bell-panel').hidden; });
+$('#bell-panel').addEventListener('click', (e) => {
+  const o = e.target.closest('[data-open]');
+  if (o) { $('#bell-panel').hidden = true; openQuotePreview(o.dataset.open); }
+  if (e.target.closest('[data-bell-task]')) { $('#bell-panel').hidden = true; $('.nav-btn[data-target="tareas"]').click(); }
+});
+document.addEventListener('click', (e) => { if (!e.target.closest('.bell-wrap')) $('#bell-panel').hidden = true; });
+setInterval(() => { if (appShown) refreshBell(); }, 300000);
+window.addEventListener('focus', () => { if (appShown) refreshBell(); });
+
+/* Acciones del presupuesto: pausar, posponer, recuperar, duplicar y crear tarea */
+function renderQuoteActions(q) {
+  const b = (a, t, cls = 'ghost') => `<button class="btn ${cls}" type="button" data-act="${a}" style="padding:4px 10px;font-size:12px">${t}</button>`;
+  let h = '';
+  if (q.status === 'emitido') h += b('replied', 'Cliente respondió (pausar seguimiento)') + b('snooze', 'Posponer 3 días');
+  if (q.status === 'rechazado' && q.closed_reason) {
+    h += q.valid_until && q.valid_until >= todayStr() ? b('recover', 'Recuperar presupuesto', '') + b('accept', 'Marcar aceptado')
+      : '<span class="muted">Archivado sin respuesta y fuera del plazo de validez: crea un presupuesto nuevo.</span>';
+  }
+  $('#q-actions').innerHTML = h + b('dup', 'Duplicar') + b('task', 'Crear tarea');
+}
+async function duplicateQuote() {
+  const { q, ls } = active;
+  const until = new Date();
+  until.setDate(until.getDate() + (+company.valid_days || 30));
+  const { data: n, error } = await db.from('quotes').insert({ client_id: q.client_id, status: 'borrador', iva_pct: q.iva_pct, subtotal: q.subtotal, total: q.total, valid_until: new Intl.DateTimeFormat('sv-SE').format(until), notes: q.notes }).select().single();
+  if (error) return toast(error.message, true);
+  const rows = ls.map((l, i) => ({ quote_id: n.id, service_name: l.service_name, description: l.description, unit: l.unit, qty: l.qty, unit_price: l.unit_price, pos: i }));
+  const { error: e2 } = await db.from('quote_lines').insert(rows);
+  if (e2) { await db.from('quotes').delete().eq('id', n.id); return toast(e2.message, true); }
+  toast(`Creado ${quoteCode(n.quote_no)} como borrador`);
+  await openQuotePreview(n.id);
+  loadHistory();
+}
+$('#q-actions').addEventListener('click', async (e) => {
+  const act = e.target.closest('[data-act]')?.dataset.act;
+  if (!act || !active) return;
+  const upd = async (patch, msg) => {
+    const { error } = await db.from('quotes').update(patch).eq('id', active.id);
+    if (error) return toast(error.message, true);
+    toast(msg);
+    await openQuotePreview(active.id);
+    loadHistory(); refreshBell();
+  };
+  if (act === 'replied') return upd({ paused_until: FOREVER }, 'Seguimiento pausado');
+  if (act === 'snooze') return upd({ paused_until: plusDays(3) }, 'Seguimiento pospuesto 3 días');
+  if (act === 'recover') return upd({ status: 'emitido', closed_reason: null, closed_at: null, paused_until: FOREVER }, 'Presupuesto recuperado');
+  if (act === 'accept') return upd({ status: 'aceptado', closed_reason: null, closed_at: null }, 'Marcado como aceptado');
+  if (act === 'task') return openTaskDialog(null, { title: `Contactar con ${active.name}: ${active.code}`, client_id: active.q.client_id, quote_id: active.id, due_date: plusDays(1) });
+  if (act === 'dup') return duplicateQuote();
+});
+
+/* Copia de seguridad y cambio de contraseña (desde Datos de empresa) */
+$('#b-export').addEventListener('click', async () => {
+  const out = { exported_at: new Date().toISOString() };
+  for (const t of ['clients', 'quotes', 'quote_lines', 'services', 'tasks', 'settings']) {
+    out[t] = [];
+    for (let from = 0; ; from += 1000) {
+      const { data, error } = await db.from(t).select('*').range(from, from + 999);
+      if (error) return toast(`No se pudo exportar ${t}: ${error.message}`, true);
+      out[t].push(...data);
+      if (data.length < 1000) break;
+    }
+  }
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(out, null, 2)], { type: 'application/json' }));
+  a.download = `almagest_copia_${todayStr()}.json`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+  toast('Copia de seguridad descargada');
+});
+$('#b-pass').addEventListener('click', () => { $('#f-pass').reset(); $('#d-pass-err').hidden = true; $('#dlg-pass').showModal(); });
+$('#d-pass-cancel').addEventListener('click', () => $('#dlg-pass').close());
+$('#f-pass').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const f = e.target, err = (m) => { $('#d-pass-err').textContent = m; $('#d-pass-err').hidden = false; };
+  if (f.elements.p1.value !== f.elements.p2.value) return err('Las dos contraseñas no coinciden.');
+  const { error } = await db.auth.updateUser({ password: f.elements.p1.value });
+  if (error) return err(error.message);
+  $('#dlg-pass').close();
+  toast('Contraseña cambiada');
+});
+
+async function boot() {
+  await loadCompany();
+  await db.rpc('run_followups'); // archiva y crea tareas según los plazos; si falta la migración, se ignora
+  loadDashboard(); refreshBell(); cacheServices(); loadClients();
+}
+
 /* ---------- Navegación ---------- */
 $$('.sidebar .nav-btn[data-target]').forEach((btn) => btn.addEventListener('click', () => {
   $$('.sidebar .nav-btn[data-target]').forEach((b) => b.classList.toggle('on', b === btn));
   const target = btn.dataset.target;
   $$('.main-content .tab-section').forEach((sec) => (sec.hidden = sec.id !== `sec-${target}`));
   if (target === 'inicio') loadDashboard();
+  if (target === 'tareas') loadTasks();
   if (target === 'presupuestos') cacheServices();
   if (target === 'clientes') loadClients();
   if (target === 'services') loadServicesTable();
@@ -548,11 +747,11 @@ $$('.sidebar .nav-btn[data-target]').forEach((btn) => btn.addEventListener('clic
 let appShown = false;
 db.auth.onAuthStateChange((event, session) => {
   if (event === 'PASSWORD_RECOVERY') { appShown = false; return show('recovery'); }
-  if (!session) { appShown = false; services = []; lines = []; clients = []; active = null; $('#dash').innerHTML = ''; company = { ...company, company_name: '', phone: '', email: '', terms: '' }; return show('login'); }
+  if (!session) { appShown = false; services = []; lines = []; clients = []; active = null; tasks = []; $('#dash').innerHTML = ''; $('#bell-count').hidden = true; company = { ...company, company_name: '', phone: '', email: '', terms: '', company_nif: '', company_address: '' }; return show('login'); }
   if (!appShown) {
     appShown = true;
     show('app');
-    setTimeout(async () => { await loadCompany(); loadDashboard(); cacheServices(); loadClients(); }, 0);
+    setTimeout(boot, 0);
   }
 });
 $('#f-login').addEventListener('submit', async (e) => {
@@ -574,7 +773,7 @@ $('#f-recovery').addEventListener('submit', async (e) => {
   toast('Contraseña actualizada');
   appShown = true;
   show('app');
-  loadCompany().then(loadDashboard); cacheServices(); loadClients();
+  boot();
 });
 $('#b-logout').addEventListener('click', () => db.auth.signOut());
 
