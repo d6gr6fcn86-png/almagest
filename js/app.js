@@ -1126,7 +1126,15 @@ if (bLogout) bLogout.addEventListener('click', () => db.auth.signOut());
 
 /* ---------- Selección múltiple y borrado masivo ---------- */
 function wireBulk({ table, rowsSel, chk, btnSel, allSel, label, reload }) {
-  const rSel = $(rowsSel), bSel =$(btnSel), aSel = $(allSel); if (!rSel \vert{}\vert{} !bSel \vert{}\vert{} !aSel) return () => {}; const refresh = () => { bSel.hidden = !$$(`.${chk}:checked`).length; };
+  const rSel = $(rowsSel),
+        bSel = $(btnSel),
+        aSel = $(allSel);
+
+  if (!rSel || !bSel || !aSel) return () => {};
+
+  const refresh = () => {
+    bSel.hidden = !$$(`.${chk}:checked`).length;
+  };
   rSel.addEventListener('change', (e) => { if (e.target.classList.contains(chk)) refresh(); });
   aSel.addEventListener('change', (e) => { $$(`.${chk}`).forEach((c) => (c.checked = e.target.checked)); refresh(); });
   bSel.addEventListener('click', async () => {
