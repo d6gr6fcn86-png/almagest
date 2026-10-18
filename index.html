@@ -38,17 +38,47 @@
       <button id="b-logout" class="link light" type="button">Salir</button>
     </header>
 
-    <!-- LAYOUT PRINCIPAL CON BARRA LATERAL -->
+    <!-- LAYOUT PRINCIPAL CON BARRA LATERAL EN ÁRBOLES -->
     <div class="app-layout">
       <aside class="sidebar">
-        <div class="sidebar-section">
-          <span class="sidebar-title">Módulos</span>
-          <button class="nav-btn on" type="button" data-target="inicio">Inicio</button>
-          <button class="nav-btn" type="button" data-target="tareas">Tareas y Agenda</button>
-          <button class="nav-btn" type="button" data-target="presupuestos">Nuevo Presupuesto</button>
-          <button class="nav-btn" type="button" data-target="historial">Historial Presupuestos</button>
-          <button class="nav-btn" type="button" data-target="clientes">Gestión de Clientes</button>
-          <button class="nav-btn" type="button" data-target="services">Catálogo de Servicios</button>
+        <div class="tree-menu">
+          
+          <!-- Rama 1: General / Control -->
+          <div class="tree-group open" id="tree-general">
+            <div class="tree-header" onclick="toggleTree('tree-general')">
+              <span class="tree-toggle-icon">[-]</span>
+              <span class="tree-title">Control General</span>
+            </div>
+            <div class="tree-children">
+              <button class="nav-btn on" type="button" data-target="inicio">Inicio</button>
+              <button class="nav-btn" type="button" data-target="tareas">Tareas y Agenda</button>
+            </div>
+          </div>
+
+          <!-- Rama 2: Comercial y Ventas -->
+          <div class="tree-group open" id="tree-ventas">
+            <div class="tree-header" onclick="toggleTree('tree-ventas')">
+              <span class="tree-toggle-icon">[-]</span>
+              <span class="tree-title">Comercial y Ventas</span>
+            </div>
+            <div class="tree-children">
+              <button class="nav-btn" type="button" data-target="presupuestos">Nuevo Presupuesto</button>
+              <button class="nav-btn" type="button" data-target="historial">Historial Presupuestos</button>
+              <button class="nav-btn" type="button" data-target="clientes">Gestión de Clientes</button>
+            </div>
+          </div>
+
+          <!-- Rama 3: Catálogo y Configuración -->
+          <div class="tree-group open" id="tree-config">
+            <div class="tree-header" onclick="toggleTree('tree-config')">
+              <span class="tree-toggle-icon">[-]</span>
+              <span class="tree-title">Configuración</span>
+            </div>
+            <div class="tree-children">
+              <button class="nav-btn" type="button" data-target="services">Catálogo de Servicios</button>
+            </div>
+          </div>
+
         </div>
       </aside>
 
@@ -67,7 +97,7 @@
         <section id="sec-presupuestos" class="tab-section" hidden>
           <div class="bar" style="justify-content: space-between; margin-bottom: 10px;">
             <h2 style="margin:0">Generador de Presupuestos Rápidos</h2>
-            <span id="draft-saved-badge" class="muted" style="font-size: 11px; display: none;">💾 Borrador guardado automáticamente</span>
+            <span id="draft-saved-badge" class="muted" style="font-size: 11px; display: none;">Borrador guardado automáticamente</span>
           </div>
           <div class="quote-layout">
 
@@ -180,7 +210,7 @@
           </div>
         </section>
 
-        <!-- 2. HISTORIAL DE PRESUPUESTOS CON COLUMNAS DE SEGUIMIENTO Y VENCIMIENTO -->
+        <!-- 2. HISTORIAL DE PRESUPUESTOS -->
         <section id="sec-historial" class="tab-section" hidden>
           <div class="bar">
             <input id="search-history" type="search" placeholder="Buscar por número de presupuesto o nombre de cliente..." aria-label="Buscar presupuesto">
@@ -243,7 +273,7 @@
           </div>
         </section>
 
-        <!-- 4. CATÁLOGO DE SERVICIOS (CON BUSCADOR) -->
+        <!-- 4. CATÁLOGO DE SERVICIOS -->
         <section id="sec-services" class="tab-section" hidden>
           <div class="bar">
             <h2>Catálogo y Tabla de Servicios</h2>
@@ -367,5 +397,16 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.109.0"></script>
   <script src="js/config.js"></script>
   <script src="js/app.js"></script>
+  <script>
+    function toggleTree(id) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.classList.toggle('open');
+      const icon = el.querySelector('.tree-toggle-icon');
+      if (icon) {
+        icon.textContent = el.classList.contains('open') ? '[-]' : '[+]';
+      }
+    }
+  </script>
 </body>
 </html>
