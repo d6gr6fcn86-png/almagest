@@ -8,6 +8,10 @@
   --tint: #E3F1E8;
   --page: #F4F7F5;
   --err: #9B2226;
+  --valid-border: #2D6A4F;
+  --valid-bg: #f2fbf5;
+  --invalid-border: #9B2226;
+  --invalid-bg: #fff5f5;
 }
 
 * { box-sizing: border-box; }
@@ -69,12 +73,23 @@ input, select, textarea {
   padding: 8px 10px;
   min-height: 36px;
   width: 100%;
+  transition: border-color .15s ease, background-color .15s ease;
 }
 
 input:hover, select:hover, textarea:hover { border-color: var(--primary); }
 input:focus, select:focus, textarea:focus {
   outline: 2px solid #2D6A4F55;
   border-color: var(--primary);
+}
+
+/* Validación visual en tiempo real */
+input.is-valid {
+  border-color: var(--valid-border) !important;
+  background-color: var(--valid-bg);
+}
+input.is-invalid {
+  border-color: var(--invalid-border) !important;
+  background-color: var(--invalid-bg);
 }
 
 /* Las casillas no heredan el tamaño de los campos de texto */
@@ -244,6 +259,19 @@ tbody tr:hover, tbody tr:focus {
   background: var(--tint);
   outline: 0;
 }
+
+/* Badges para el seguimiento en las celdas de la tabla */
+.date-badge {
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+}
+.date-badge.done { background: #d4edda; color: #155724; }
+.date-badge.pending { background: #fff3cd; color: #856404; }
+.date-badge.expired { background: #f8d7da; color: #721c24; }
+.date-badge.neutral { background: #e2e3e5; color: #383d41; }
 
 /* Rejilla de presupuestos, doble panel */
 .quote-layout {
