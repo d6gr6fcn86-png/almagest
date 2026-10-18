@@ -34,6 +34,7 @@
     <header class="top">
       <strong>AlmaGest</strong>
       <span class="grow"></span>
+      <span class="bell-wrap"><button id="b-bell" class="icon" type="button" aria-label="Notificaciones">🔔</button><span id="bell-count" hidden></span><div id="bell-panel" hidden></div></span>
       <button id="b-logout" class="link light" type="button">Salir</button>
     </header>
 
@@ -43,6 +44,7 @@
         <div class="sidebar-section">
           <span class="sidebar-title">Módulos</span>
           <button class="nav-btn on" type="button" data-target="inicio">Inicio</button>
+          <button class="nav-btn" type="button" data-target="tareas">Tareas y Agenda</button>
           <button class="nav-btn" type="button" data-target="presupuestos">Nuevo Presupuesto</button>
           <button class="nav-btn" type="button" data-target="historial">Historial Presupuestos</button>
           <button class="nav-btn" type="button" data-target="clientes">Gestión de Clientes</button>
@@ -55,6 +57,12 @@
         <!-- 1. PRESUPUESTOS (doble panel) -->
         <!-- 0. INICIO (dashboard) -->
         <section id="sec-inicio" class="tab-section"><div id="dash"></div></section>
+
+        <!-- TAREAS Y AGENDA -->
+        <section id="sec-tareas" class="tab-section" hidden>
+          <div class="bar"><h2 style="margin:0">Tareas y agenda</h2><span class="grow"></span><button id="b-new-task" class="btn" type="button">Nueva tarea</button></div>
+          <div id="task-list"></div>
+        </section>
 
         <!-- 1. PRESUPUESTOS (doble panel) -->
         <section id="sec-presupuestos" class="tab-section" hidden>
@@ -185,6 +193,7 @@
                 <option value="aceptado">✅ Aceptado</option>
                 <option value="rechazado">❌ Rechazado</option>
                 <option value="facturado">💶 Facturado</option>
+                <option value="pagado">💰 Pagado</option>
               </select>
             </div>
 
@@ -327,11 +336,13 @@
               <option value="aceptado">Aceptado</option>
               <option value="rechazado">Rechazado</option>
               <option value="facturado">Facturado</option>
+              <option value="pagado">Pagado</option>
             </select>
           </label>
         </div>
       </div>
 
+      <div id="q-actions" style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px;"></div>
       <!-- El contenido del presupuesto (y del PDF) lo genera app.js con los Datos de empresa -->
       <div id="pdf-printable-area" style="background: #fff; padding: 30px; border: 1px solid var(--border); border-radius: 8px; font-family: Arial, sans-serif; color: #163D2D; margin-bottom: 16px;"></div>
 
