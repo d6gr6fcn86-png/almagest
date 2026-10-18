@@ -21,6 +21,18 @@ const round2 = (n) => Math.round((n + Number.EPSILON) * 100) / 100;
 const priceLabel = (l) => (l.unit === '%' ? `${Number(l.unit_price)} %` : eur(l.unit_price));
 const delMsg = (e) => (e.code === '23503' ? 'No se puede eliminar: tiene presupuestos asociados. Se conservan en el historial.' : e.message);
 
+/* Helper de fechas */
+function addDays(dateStr, n) {
+  if (!dateStr) return null;
+  const d = new Date(dateStr);
+  d.setDate(d.getDate() + n);
+  return d;
+}
+function formatDateShort(d) {
+  if (!d) return '—';
+  return d.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: '2-digit' });
+}
+
 /* Importes: cada línea se redondea a céntimos; las líneas en % se calculan sobre las demás */
 function lineAmounts(lines) {
   const base = round2(lines.filter((l) => l.unit !== '%').reduce((a, l) => a + round2(l.unit_price * l.qty), 0));
@@ -32,7 +44,8 @@ function calcTotals(lines, iva) {
   const tax = round2((subtotal * iva) / 100);
   return { amounts, subtotal, tax, total: round2(subtotal + tax) };
 }
-/* Número para wa.me: respeta prefijos internacionales y añade 34 a los de 9 cifras */
+
+/* Número para wa.me */
 function waNumber(p) {
   const d = digits(p);
   if ((p || '').trim().startsWith('+')) return d;
@@ -44,7 +57,7 @@ function show(view) { for (const v of ['login', 'recovery', 'app']) $('#v-' + v)
 let toastTimer;
 function toast(msg, isErr = false) {
   const t = $('#toast');
-  (document.querySelector('dialog[open]') || document.body).appendChild(t); // visible también sobre los diálogos
+  (document.querySelector('dialog[open]') || document.body).appendChild(t);
   t.textContent = msg;
   t.className = isErr ? 'err' : '';
   t.hidden = false;
@@ -52,7 +65,29 @@ function toast(msg, isErr = false) {
   toastTimer = setTimeout(() => (t.hidden = true), 4000);
 }
 
-/* ---------- Datos de empresa (tabla settings) ---------- */
+/* ---------- Validación visual en tiempo real ---------- */
+function setupRealtimeValidation() {
+  document.addEventListener('input', (e) => {
+    if (!e.target.classList.contains('validate-field')) return;
+    const input = e.target;
+    const val = input.value.trim();
+    if (!val) {
+      input.classList.remove('is-valid', 'is-invalid');
+      return;
+    }
+    if (input.type === 'tel' || input.name.includes('phone')) {
+      const isValid = digits(val).length >= 9;
+      input.classList.toggle('is-valid', isValid);
+      input.classList.toggle('is-invalid', !isValid);
+    } else if (input.type === 'email' || input.name.includes('email')) {
+      const isValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val);
+      input.classList.toggle('is-valid', isValid);
+      input.classList.toggle('is-invalid', !isValid);
+    }
+  });
+}
+
+/* ---------- Datos de empresa ---------- */
 let company = { company_name: '', phone: '', email: '', iva_pct: 21, valid_days: 30, terms: '', company_nif: '', company_address: '', contact1_days: 3, contact2_days: 6, close_days: 7 };
 async function loadCompany() {
   const { data } = await db.from('settings').select('*').maybeSingle();
@@ -120,8 +155,66 @@ async function cacheServices() {
   if (cats.includes(cur)) sel.value = cur;
 }
 
-/* ---------- Presupuesto en curso ---------- */
+/* ---------- Autoguardado local del borrador del presupuesto ---------- */
+const DRAFT_KEY = 'almagest_quote_draft_v1';
 let lines = [];
+
+function saveQuoteDraft() {
+  const draft = {
+    phone: $('#pres_phone').value,
+    name: $('#pres_name').value,
+    email: $('#pres_email').value,
+    locality: $('#pres_locality').value,
+    clientCode: $('#pres_client_code').value,
+    clientId: $('#pres_client_code').dataset.id || '',
+    notes: $('#pres_notes').value,
+    extraConcept: $('#pres_extra_concept').value,
+    extraPrice: $('#pres_extra_price').value,
+    extraChecked: $('#chk-toggle-extra').checked,
+    lines: lines,
+    timestamp: Date.now()
+  };
+  localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+  const badge = $('#draft-saved-badge');
+  if (badge) { badge.style.display = 'inline-block'; }
+}
+
+function restoreQuoteDraft() {
+  const raw = localStorage.getItem(DRAFT_KEY);
+  if (!raw) return;
+  try {
+    const draft = JSON.parse(raw);
+    if (!draft) return;
+    if (draft.phone !== undefined) $('#pres_phone').value = draft.phone;
+    if (draft.name !== undefined) $('#pres_name').value = draft.name;
+    if (draft.email !== undefined) $('#pres_email').value = draft.email;
+    if (draft.locality !== undefined) $('#pres_locality').value = draft.locality;
+    if (draft.notes !== undefined) $('#pres_notes').value = draft.notes;
+    if (draft.clientCode) $('#pres_client_code').value = draft.clientCode;
+    if (draft.clientId) $('#pres_client_code').dataset.id = draft.clientId;
+    if (draft.extraConcept) $('#pres_extra_concept').value = draft.extraConcept;
+    if (draft.extraPrice) $('#pres_extra_price').value = draft.extraPrice;
+    if (draft.extraChecked) {
+      $('#chk-toggle-extra').checked = true;
+      $('#extra-fields-container').style.display = 'block';
+    }
+    if (Array.isArray(draft.lines)) {
+      lines = draft.lines;
+    }
+    renderPreview();
+    $$('.validate-field').forEach((el) => el.dispatchEvent(new Event('input', { bubbles: true })));
+  } catch (e) {
+    console.error('Error restaurando el borrador local:', e);
+  }
+}
+
+function clearQuoteDraft() {
+  localStorage.removeItem(DRAFT_KEY);
+  const badge = $('#draft-saved-badge');
+  if (badge) { badge.style.display = 'none'; }
+}
+
+/* ---------- Presupuesto en curso ---------- */
 function renderPreview() {
   const t = calcTotals(lines, +company.iva_pct);
   $('#preview-rows').innerHTML = lines.length
@@ -136,7 +229,7 @@ function renderPreview() {
 }
 $('#preview-rows').addEventListener('click', (e) => {
   const b = e.target.closest('[data-rm]');
-  if (b) { lines.splice(+b.dataset.rm, 1); renderPreview(); }
+  if (b) { lines.splice(+b.dataset.rm, 1); renderPreview(); saveQuoteDraft(); }
 });
 
 const clearClient = () => { const c = $('#pres_client_code'); c.value = ''; delete c.dataset.id; };
@@ -150,11 +243,14 @@ function resetQuoteForm() {
   for (const s of ['#extra-fields-container', '#subservice-container', '#package-services-container']) $(s).style.display = 'none';
   $('#package-items-list').innerHTML = '';
   $('#pres-result-info').textContent = '';
+  $$('.validate-field').forEach((el) => el.classList.remove('is-valid', 'is-invalid'));
+  clearQuoteDraft();
 }
 
 $('#chk-toggle-extra').addEventListener('change', (e) => {
   $('#extra-fields-container').style.display = e.target.checked ? 'block' : 'none';
   if (!e.target.checked) { $('#pres_extra_concept').value = ''; $('#pres_extra_price').value = ''; }
+  saveQuoteDraft();
 });
 $('#b-add-extra').addEventListener('click', () => {
   const concept = $('#pres_extra_concept').value.trim();
@@ -166,7 +262,12 @@ $('#b-add-extra').addEventListener('click', () => {
   $('#chk-toggle-extra').checked = false;
   $('#extra-fields-container').style.display = 'none';
   toast('Suplemento añadido al presupuesto');
+  saveQuoteDraft();
 });
+
+/* Escuchar cambios para autoguardado */
+$('#f-presupuesto').addEventListener('input', () => saveQuoteDraft());
+$('#f-presupuesto').addEventListener('change', () => saveQuoteDraft());
 
 $('#pres_category').addEventListener('change', () => {
   const cat = $('#pres_category').value;
@@ -210,8 +311,9 @@ $('#b-add-lines').addEventListener('click', () => {
   if (!added) return toast('Selecciona al menos un servicio con el check.', true);
   renderPreview();
   toast(`${added} servicio(s) añadido(s) al resumen`);
+  saveQuoteDraft();
 });
-$('#b-reset-presupuesto').addEventListener('click', () => { resetQuoteForm(); toast('Formulario y presupuesto restablecidos'); });
+$('#b-reset-presupuesto').addEventListener('click', () => { resetQuoteForm(); toast('Formulario y borrador local restablecidos'); });
 
 /* Búsqueda de cliente por teléfono */
 let phoneTimer;
@@ -219,7 +321,7 @@ const suggestions = new Map();
 const hideSug = () => ($('#phone-suggestions').style.display = 'none');
 $('#pres_phone').addEventListener('input', (e) => {
   clearTimeout(phoneTimer);
-  clearClient();            // al cambiar el teléfono se descarta el cliente elegido antes
+  clearClient();
   lockClientFields(false);
   const q = e.target.value.trim();
   if (!q) { for (const [s, v] of [['#pres_name', ''], ['#pres_email', ''], ['#pres_locality', 'No especificada']]) $(s).value = v; }
@@ -245,8 +347,10 @@ $('#phone-suggestions').addEventListener('click', (e) => {
   $('#pres_locality').value = c.locality;
   $('#pres_client_code').value = code(c.code_num);
   $('#pres_client_code').dataset.id = c.id;
-  lockClientFields(true);   // los datos de una ficha existente se editan en Clientes
+  lockClientFields(true);
   hideSug();
+  $$('#pres_phone, #pres_email').forEach((el) => el.dispatchEvent(new Event('input', { bubbles: true })));
+  saveQuoteDraft();
 });
 document.addEventListener('click', (e) => { if (!e.target.closest('#pres_phone, #phone-suggestions')) hideSug(); });
 
@@ -290,7 +394,7 @@ $('#b-save-presupuesto').addEventListener('click', async () => {
     const rows = lines.map((l, i) => ({ quote_id: q.id, service_name: l.service_name, unit: l.unit, qty: l.qty, unit_price: l.unit_price, pos: i }));
     const { error: lErr } = await db.from('quote_lines').insert(rows);
     if (lErr) {
-      await db.from('quotes').delete().eq('id', q.id); // no se deja un presupuesto sin líneas
+      await db.from('quotes').delete().eq('id', q.id);
       return toast('No se pudieron guardar las líneas: ' + lErr.message, true);
     }
     resetQuoteForm();
@@ -301,7 +405,7 @@ $('#b-save-presupuesto').addEventListener('click', async () => {
   }
 });
 
-/* ---------- Historial ---------- */
+/* ---------- Historial con Columnas de Recordatorios y Vencimiento ---------- */
 async function loadHistory() {
   const q = $('#search-history').value.trim();
   let query = db.from('quotes').select('*, clients(name, phone, email, locality)').order('created_at', { ascending: false }).limit(100);
@@ -309,7 +413,7 @@ async function loadHistory() {
   if (st !== 'todos') query = query.eq('status', st);
   let data = [];
   if (q) {
-    const m = q.match(/^(?:p-?)?0*(\d{1,6})$/i); // «P-0012» o «12» buscan por número
+    const m = q.match(/^(?:p-?)?0*(\d{1,6})$/i);
     if (m) query = query.eq('quote_no', +m[1]);
     else {
       const { data: cl } = await db.rpc('search_clients', { q });
@@ -323,12 +427,49 @@ async function loadHistory() {
     data = r.data;
   }
   $('#empty-history').hidden = data.length > 0;
-  $('#rows-history').innerHTML = data.map((x) => `<tr>
-    <td><strong>${quoteCode(x.quote_no)}</strong></td><td>${new Date(x.created_at).toLocaleDateString('es-ES')}</td>
-    <td><a href="#" class="link" data-client="${esc(x.client_id)}" title="Abrir ficha del cliente"><strong>${esc(x.clients?.name || 'Cliente')}</strong></a></td>
-    <td><span style="padding:3px 8px;border-radius:4px;font-size:11px;font-weight:600;${STATUS_STYLE[x.status] || ''}">${esc(statusLabel(x))}</span></td>
-    <td><strong>${eur(x.total)}</strong></td>
-    <td><button class="btn ghost" type="button" data-open="${esc(x.id)}" style="padding:4px 10px;font-size:12px">Ver / Enviar PDF</button></td></tr>`).join('');
+
+  const now = new Date();
+  const c1Days = +company.contact1_days || 3;
+  const c2Days = +company.contact2_days || 6;
+  const closeDays = +company.close_days || 7;
+
+  $('#rows-history').innerHTML = data.map((x) => {
+    const sentBase = x.sent_at || x.created_at;
+    const dRec1 = addDays(sentBase, c1Days);
+    const dRec2 = addDays(sentBase, c2Days);
+    const dClose = addDays(sentBase, closeDays);
+    const dValid = x.valid_until ? new Date(x.valid_until + 'T00:00:00') : null;
+
+    let r1Html = '—', r2Html = '—', closeHtml = '—', validHtml = '—';
+
+    if (x.status === 'emitido') {
+      r1Html = `<span class="date-badge ${now >= dRec1 ? 'done' : 'pending'}">${formatDateShort(dRec1)}</span>`;
+      r2Html = `<span class="date-badge ${now >= dRec2 ? 'done' : 'pending'}">${formatDateShort(dRec2)}</span>`;
+      closeHtml = `<span class="date-badge ${now >= dClose ? 'expired' : 'pending'}">${formatDateShort(dClose)}</span>`;
+    } else {
+      r1Html = `<span class="date-badge neutral">${formatDateShort(dRec1)}</span>`;
+      r2Html = `<span class="date-badge neutral">${formatDateShort(dRec2)}</span>`;
+      closeHtml = `<span class="date-badge neutral">${formatDateShort(dClose)}</span>`;
+    }
+
+    if (dValid) {
+      const isExpired = now > dValid && (x.status === 'borrador' || x.status === 'emitido');
+      validHtml = `<span class="date-badge ${isExpired ? 'expired' : 'neutral'}">${formatDateShort(dValid)}</span>`;
+    }
+
+    return `<tr>
+      <td><strong>${quoteCode(x.quote_no)}</strong></td>
+      <td>${new Date(x.created_at).toLocaleDateString('es-ES')}</td>
+      <td><a href="#" class="link" data-client="${esc(x.client_id)}" title="Abrir ficha del cliente"><strong>${esc(x.clients?.name || 'Cliente')}</strong></a></td>
+      <td><span style="padding:3px 8px;border-radius:4px;font-size:11px;font-weight:600;${STATUS_STYLE[x.status] || ''}">${esc(statusLabel(x))}</span></td>
+      <td>${r1Html}</td>
+      <td>${r2Html}</td>
+      <td>${closeHtml}</td>
+      <td>${validHtml}</td>
+      <td><strong>${eur(x.total)}</strong></td>
+      <td><button class="btn ghost" type="button" data-open="${esc(x.id)}" style="padding:4px 10px;font-size:12px">Ver / Enviar PDF</button></td>
+    </tr>`;
+  }).join('');
 }
 let historyTimer;
 $('#search-history').addEventListener('input', () => { clearTimeout(historyTimer); historyTimer = setTimeout(loadHistory, 250); });
@@ -393,7 +534,7 @@ async function openQuotePreview(id) {
 async function setStatus(id, status) {
   const patch = { status, closed_reason: null, closed_at: null };
   if (status === 'pagado') patch.paid_at = new Date().toISOString();
-  if (status === 'emitido') { patch.sent_at = new Date().toISOString(); patch.paused_until = null; } // base de las alertas «sin respuesta»
+  if (status === 'emitido') { patch.sent_at = new Date().toISOString(); patch.paused_until = null; }
   const { error } = await db.from('quotes').update(patch).eq('id', id);
   if (error) { toast('No se pudo actualizar el estado: ' + error.message, true); return false; }
   return true;
@@ -433,7 +574,7 @@ $('#b-send-email').addEventListener('click', () => {
 });
 $('#b-close-preview').addEventListener('click', () => $('#dlg-quote-preview').close());
 
-/* ---------- Inicio (dashboard) ---------- */
+/* ---------- Inicio (dashboard) con vista ampliada de facturación ---------- */
 function dashStats(monthRows, pendingRows, now, validDays, followDays) {
   const ref = (q) => new Date(q.sent_at || q.created_at);
   const sum = (a) => round2(a.reduce((s, q) => s + Number(q.total), 0));
@@ -455,7 +596,6 @@ function dashStats(monthRows, pendingRows, now, validDays, followDays) {
     waiting: pend.filter((q) => q.days > followDays && q.days <= validDays),
   };
 }
-/* Gráficos en SVG/CSS puro: sin librerías externas */
 function gaugeSvg(pct, label) {
   const col = pct >= 50 ? '#2D6A4F' : pct >= 25 ? '#d9a400' : '#9B2226';
   const arc = 'M 20 100 A 80 80 0 0 1 180 100';
@@ -474,19 +614,21 @@ function donutSvg(parts, total) {
   return `<svg viewBox="0 0 100 100" class="donut" role="img" aria-label="Estado de los presupuestos enviados este mes"><circle cx="50" cy="50" r="38" class="d-bg"/>
     <g transform="rotate(-90 50 50)">${segs}</g><text x="50" y="53" class="d-v">${total}</text><text x="50" y="65" class="d-s">enviados</text></svg>`;
 }
+
 async function loadDashboard() {
   const now = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
   const since = new Date(now.getFullYear(), now.getMonth() - 5, 1).toISOString();
   const cols = 'id, quote_no, status, total, created_at, sent_at, closed_reason, clients(name)';
-  const [month, pending, recent, drafts, newClients] = await Promise.all([
+  const [month, pending, recent, drafts, newClients, billingData] = await Promise.all([
     db.from('quotes').select(cols).or(`sent_at.gte.${since},created_at.gte.${since}`).limit(1000),
     db.from('quotes').select(cols).eq('status', 'emitido').limit(500),
     db.from('quotes').select(cols).order('created_at', { ascending: false }).limit(5),
     db.from('quotes').select('id', { count: 'exact', head: true }).eq('status', 'borrador'),
     db.from('clients').select('id', { count: 'exact', head: true }).gte('created_at', monthStart),
+    db.from('quotes').select('status, total').in('status', ['facturado', 'pagado']),
   ]);
-  const failed = [month, pending, recent].find((r) => r.error);
+  const failed = [month, pending, recent, billingData].find((r) => r.error);
   if (failed) return toast('No se pudo cargar el inicio: ' + failed.error.message, true);
 
   const validDays = +company.valid_days || 30;
@@ -499,13 +641,22 @@ async function loadDashboard() {
   const nDrafts = drafts.count || 0;
   const nNew = newClients.count || 0;
 
+  // Cálculo de facturación y cobros
+  const billedQuotes = billingData.data || [];
+  const totalBilled = billedQuotes.reduce((acc, q) => acc + Number(q.total), 0);
+  const totalPaid = billedQuotes.filter((q) => q.status === 'pagado').reduce((acc, q) => acc + Number(q.total), 0);
+  const pendingCollection = billedQuotes.filter((q) => q.status === 'facturado').reduce((acc, q) => acc + Number(q.total), 0);
+
   const delta = (a, b) => (b ? Math.round(((a - b) / b) * 100) : null);
   const chip = (d) => (d === null ? '' : `<span class="chip ${d > 0 ? 'up' : d < 0 ? 'down' : 'flat'}" title="Frente al mes anterior">${d > 0 ? '▲' : d < 0 ? '▼' : '='} ${Math.abs(d)} %</span>`);
+  
   const kpis = [
     { l: 'Enviados este mes', v: s.sent.length, c: chip(delta(s.sent.length, s.prev.sent.length)), s: monthName },
     { l: 'Total presupuestado', v: eur(s.sentTotal), c: chip(delta(s.sentTotal, s.prev.sentTotal)), s: 'IVA incl.' },
-    { l: 'Importe aceptado', v: eur(s.accTotal), c: chip(delta(s.accTotal, s.prev.accTotal)), s: `${s.acc.length} presupuesto${s.acc.length === 1 ? '' : 's'} aceptado${s.acc.length === 1 ? '' : 's'}` },
+    { l: 'Importe aceptado', v: eur(s.accTotal), c: chip(delta(s.accTotal, s.prev.accTotal)), s: `${s.acc.length} aceptado${s.acc.length === 1 ? '' : 's'}` },
     { l: 'Pendientes de respuesta', v: s.pend.length, c: '', s: eur(s.pendTotal) + ' en juego', cls: s.expired.length ? 'err' : s.waiting.length ? 'warn' : '' },
+    { l: 'Cobrado total (Pagado)', v: eur(totalPaid), c: '', s: `de ${eur(totalBilled)} facturados` },
+    { l: 'Pendiente de cobro', v: eur(pendingCollection), c: '', s: 'Aún sin ingresar', cls: pendingCollection > 0 ? 'warn' : '' },
   ];
 
   const nPend = s.sent.filter((q) => q.status === 'emitido').length;
@@ -544,7 +695,7 @@ $('#dash').addEventListener('click', (e) => { const o = e.target.closest('[data-
 $('#dash').addEventListener('keydown', (e) => { const o = e.key === 'Enter' && e.target.closest('[data-open]'); if (o) openQuotePreview(o.dataset.open); });
 $('#dlg-quote-preview').addEventListener('close', () => { if (!$('#sec-inicio').hidden) loadDashboard(); });
 
-/* ---------- Tareas y agenda, campana y acciones del seguimiento ---------- */
+/* ---------- Tareas y agenda, campana y acciones ---------- */
 const todayStr = () => new Intl.DateTimeFormat('sv-SE').format(new Date());
 const plusDays = (n) => { const d = new Date(); d.setDate(d.getDate() + n); return new Intl.DateTimeFormat('sv-SE').format(d); };
 const FOREVER = '2999-12-31';
@@ -623,7 +774,7 @@ $('#d-task-delete').addEventListener('click', async () => {
   reloadTasks();
 });
 
-/* Campana: tareas para hoy o vencidas + presupuestos archivados sin respuesta esta semana */
+/* Campana */
 async function refreshBell() {
   const t = todayStr(), since = new Date(Date.now() - 7 * 864e5).toISOString();
   const [tk, cl] = await Promise.all([
@@ -651,7 +802,7 @@ document.addEventListener('click', (e) => { if (!e.target.closest('.bell-wrap'))
 setInterval(() => { if (appShown) refreshBell(); }, 300000);
 window.addEventListener('focus', () => { if (appShown) refreshBell(); });
 
-/* Acciones del presupuesto: pausar, posponer, recuperar, duplicar y crear tarea */
+/* Acciones del presupuesto */
 function renderQuoteActions(q) {
   const b = (a, t, cls = 'ghost') => `<button class="btn ${cls}" type="button" data-act="${a}" style="padding:4px 10px;font-size:12px">${t}</button>`;
   let h = '';
@@ -693,7 +844,7 @@ $('#q-actions').addEventListener('click', async (e) => {
   if (act === 'dup') return duplicateQuote();
 });
 
-/* Copia de seguridad y cambio de contraseña (desde Datos de empresa) */
+/* Copia de seguridad y cambio de contraseña */
 $('#b-export').addEventListener('click', async () => {
   const out = { exported_at: new Date().toISOString() };
   for (const t of ['clients', 'quotes', 'quote_lines', 'services', 'tasks', 'settings']) {
@@ -720,21 +871,9 @@ $('#f-pass').addEventListener('submit', async (e) => {
   if (f.elements.p1.value !== f.elements.p2.value) return err('Las dos contraseñas no coinciden.');
   const { error } = await db.auth.updateUser({ password: f.elements.p1.value });
   if (error) return err(error.message);
-  $('#dlg-pass').close();
-  toast('Contraseña cambiada');
-});
-
-async function boot() {
-  await loadCompany();
-  await db.rpc('run_followups'); // archiva y crea tareas según los plazos; si falta la migración, se ignora
-  loadDashboard(); refreshBell(); cacheServices(); loadClients();
-}
-
-/* ---------- Navegación ---------- */
-$$('.sidebar .nav-btn[data-target]').forEach((btn) => btn.addEventListener('click', () => {
-  $$('.sidebar .nav-btn[data-target]').forEach((b) => b.classList.toggle('on', b === btn));
-  const target = btn.dataset.target;
-  $$('.main-content .tab-section').forEach((sec) => (sec.hidden = sec.id !== `sec-${target}`));
+  $('#dlg-pass').close(); toast('Contraseña cambiada'); });  async function boot() { setupRealtimeValidation(); await loadCompany(); restoreQuoteDraft(); try { await db.rpc('run_followups'); } catch (e) { /* fallback si falta RPC */ } loadDashboard(); refreshBell(); cacheServices(); loadClients(); }  /* ---------- Navegación ---------- */ $$('.sidebar .nav-btn[data-target]').forEach((btn) => btn.addEventListener('click', () => {
+  $$('.sidebar .nav-btn[data-target]').forEach((b) => b.classList.toggle('on', b === btn)); const target = btn.dataset.target; $$
+('.main-content .tab-section').forEach((sec) => (sec.hidden = sec.id !== `sec-${target}`));
   if (target === 'inicio') loadDashboard();
   if (target === 'tareas') loadTasks();
   if (target === 'presupuestos') cacheServices();
@@ -781,9 +920,8 @@ $('#b-logout').addEventListener('click', () => db.auth.signOut());
 function wireBulk({ table, rowsSel, chk, btnSel, allSel, label, reload }) {
   const refresh = () => { $(btnSel).hidden = !$$(`.${chk}:checked`).length; };
   $(rowsSel).addEventListener('change', (e) => { if (e.target.classList.contains(chk)) refresh(); });
-  $(allSel).addEventListener('change', (e) => { $$(`.${chk}`).forEach((c) => (c.checked = e.target.checked)); refresh(); });
-  $(btnSel).addEventListener('click', async () => {
-    const ids = $$(`.${chk}:checked`).map((c) => c.value);
+  $(allSel).addEventListener('change', (e) => {$$(`.${chk}`).forEach((c) => (c.checked = e.target.checked)); refresh(); });
+  $(btnSel).addEventListener('click', async () => { const ids = $$(`.${chk}:checked`).map((c) => c.value);
     if (!ids.length || !confirm(`¿Eliminar ${ids.length} ${label} seleccionados?`)) return;
     const { error } = await db.from(table).delete().in('id', ids);
     if (error) return toast(delMsg(error), true);
@@ -794,13 +932,19 @@ function wireBulk({ table, rowsSel, chk, btnSel, allSel, label, reload }) {
   return refresh;
 }
 
-/* ---------- Catálogo de servicios ---------- */
+/* ---------- Catálogo de servicios con filtro instantáneo ---------- */
 let refreshServicesBulk = () => {};
 async function loadServicesTable() {
   const { data, error } = await db.from('services').select('*').order('category').order('name');
   if (error) return toast(error.message, true);
-  $('#empty-services').hidden = data.length > 0;
-  $('#rows-services').innerHTML = data.map((s) => `<tr>
+  
+  const searchQ = ($('#search-services')?.value || '').toLowerCase().trim();
+  const filtered = searchQ
+    ? data.filter((s) => (s.name || '').toLowerCase().includes(searchQ) || (s.category || '').toLowerCase().includes(searchQ) || (s.description || '').toLowerCase().includes(searchQ))
+    : data;
+
+  $('#empty-services').hidden = filtered.length > 0;
+  $('#rows-services').innerHTML = filtered.map((s) => `<tr>
     <td><input type="checkbox" class="service-row-select" value="${esc(s.id)}" aria-label="Seleccionar servicio"></td>
     <td>${esc(s.category || 'General')}</td>
     <td><strong>${esc(s.name)}</strong>${s.description ? `<br><small class="muted">${esc(s.description)}</small>` : ''}</td>
@@ -809,6 +953,13 @@ async function loadServicesTable() {
         <button class="btn ghost red" type="button" data-del="${esc(s.id)}" style="padding:4px 8px;font-size:11px">Eliminar</button></td></tr>`).join('');
   refreshServicesBulk();
 }
+
+let serviceSearchTimer;
+$('#search-services')?.addEventListener('input', () => {
+  clearTimeout(serviceSearchTimer);
+  serviceSearchTimer = setTimeout(loadServicesTable, 200);
+});
+
 refreshServicesBulk = wireBulk({ table: 'services', rowsSel: '#rows-services', chk: 'service-row-select', btnSel: '#b-delete-selected-services', allSel: '#select-all-services', label: 'servicios', reload: async () => { await loadServicesTable(); cacheServices(); } });
 $('#rows-services').addEventListener('click', async (e) => {
   const ed = e.target.closest('[data-edit]');
@@ -884,7 +1035,7 @@ function openForm(c) {
   for (const k of ['name', 'phone', 'email', 'locality', 'address', 'nif', 'kind', 'notes']) f.elements[k].value = c?.[k] ?? (k === 'kind' ? 'particular' : '');
   $('#d-err').hidden = true;
   $('#d-delete').hidden = !c;
-  $('#dlg').showModal();
+  $('#dlg').showModal(); $$('#dlg .validate-field').forEach((el) => el.dispatchEvent(new Event('input', { bubbles: true })));
 }
 async function findDuplicates(v) {
   const found = new Map();
