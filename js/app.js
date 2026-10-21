@@ -66,26 +66,17 @@ function toast(msg, isErr = false) {
 }
 
 /* ---------- Validación visual en tiempo real ---------- */
-function setupRealtimeValidation() {
-  document.addEventListener('input', (e) => {
-    if (!e.target.classList.contains('validate-field')) return;
-    const input = e.target;
-    const val = input.value.trim();
-    if (!val) {
-      input.classList.remove('is-valid', 'is-invalid');
-      return;
-    }
-    if (input.type === 'tel' || input.name.includes('phone')) {
-      const isValid = digits(val).length >= 9;
-      input.classList.toggle('is-valid', isValid);
-      input.classList.toggle('is-invalid', !isValid);
-    } else if (input.type === 'email' || input.name.includes('email')) {
-      const isValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val);
-      input.classList.toggle('is-valid', isValid);
-      input.classList.toggle('is-invalid', !isValid);
-    }
-  });
+function validateField(input) {
+  const val = input.value.trim();
+  if (!val) { input.classList.remove('is-valid', 'is-invalid'); return; }
+  const ok = input.type === 'tel' || input.name.includes('phone')
+    ? digits(val).length >= 9
+    : /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val);
+  input.classList.toggle('is-valid', ok);
+  input.classList.toggle('is-invalid', !ok);
 }
+const validateAll = (root = document) => root.querySelectorAll('.validate-field').forEach(validateField);
+document.addEventListener('input', (e) => { if (e.target.classList.contains('validate-field')) validateField(e.target); });
 
 /* ---------- Datos de empresa ---------- */
 let company = { company_name: '', phone: '', email: '', iva_pct: 21, valid_days: 30, terms: '', company_nif: '', company_address: '', contact1_days: 3, contact2_days: 6, close_days: 7 };
@@ -219,13 +210,14 @@ function restoreQuoteDraft() {
   try {
     const draft = JSON.parse(raw);
     if (!draft) return;
+    if (Date.now() - (draft.timestamp || 0) > 864e5) return clearQuoteDraft(); // borradores de más de 24 h: se descartan
     if (draft.phone !== undefined) $('#pres_phone').value = draft.phone;
     if (draft.name !== undefined) $('#pres_name').value = draft.name;
     if (draft.email !== undefined) $('#pres_email').value = draft.email;
     if (draft.locality !== undefined) $('#pres_locality').value = draft.locality;
     if (draft.notes !== undefined) $('#pres_notes').value = draft.notes;
     if (draft.clientCode) $('#pres_client_code').value = draft.clientCode;
-    if (draft.clientId) $('#pres_client_code').dataset.id = draft.clientId;
+    if (draft.clientId) { $('#pres_client_code').dataset.id = draft.clientId; lockClientFields(true); }
     if (draft.extraConcept) $('#pres_extra_concept').value = draft.extraConcept;
     if (draft.extraPrice) $('#pres_extra_price').value = draft.extraPrice;
     if (draft.extraChecked) {
@@ -236,7 +228,7 @@ function restoreQuoteDraft() {
       lines = draft.lines;
     }
     renderPreview();
-    $$('.validate-field').forEach((el) => el.dispatchEvent(new Event('input', { bubbles: true })));
+    validateAll();
   } catch (e) {
     console.error('Error restaurando el borrador local:', e);
   }
@@ -430,7 +422,7 @@ if (phoneSuggestions) {
     $('#pres_client_code').dataset.id = c.id;
     lockClientFields(true);
     hideSug();
-    $$('#pres_phone, #pres_email').forEach((el) => el.dispatchEvent(new Event('input', { bubbles: true })));
+    validateAll();
     saveQuoteDraft();
   });
 }
@@ -532,15 +524,18 @@ async function loadHistory() {
     const dValid = x.valid_until ? new Date(x.valid_until + 'T00:00:00') : null;
 
     let r1Html = '—', r2Html = '—', closeHtml = '—', validHtml = '—';
-
-    if (x.status === 'emitido') {
-      r1Html = `<span class="date-badge ${now >= dRec1 ? 'done' : 'pending'}">${formatDateShort(dRec1)}</span>`;
-      r2Html = `<span class="date-badge ${now >= dRec2 ? 'done' : 'pending'}">${formatDateShort(dRec2)}</span>`;
-      closeHtml = `<span class="date-badge ${now >= dClose ? 'expired' : 'pending'}">${formatDateShort(dClose)}</span>`;
-    } else {
-      r1Html = `<span class="date-badge neutral">${formatDateShort(dRec1)}</span>`;
-      r2Html = `<span class="date-badge neutral">${formatDateShort(dRec2)}</span>`;
-      closeHtml = `<span class="date-badge neutral">${formatDateShort(dClose)}</span>`;
+    const badge = (cls, txt) => `<span class="date-badge ${cls}">${txt}</span>`;
+    // el seguimiento solo afecta a presupuestos emitidos después de activarlo
+    const inScope = x.status === 'emitido' && new Date(sentBase) >= new Date(company.followup_since || 0);
+    const paused = inScope && x.paused_until && x.paused_until >= todayStr();
+    if (paused) {
+      r1Html = r2Html = closeHtml = badge('neutral', 'Pausado');
+    } else if (inScope) {
+      r1Html = badge(now >= dRec1 ? 'done' : 'pending', formatDateShort(dRec1));
+      r2Html = badge(now >= dRec2 ? 'done' : 'pending', formatDateShort(dRec2));
+      closeHtml = badge(now >= dClose ? 'expired' : 'pending', formatDateShort(dClose));
+    } else if (x.closed_at) {
+      closeHtml = badge('expired', formatDateShort(new Date(x.closed_at)));
     }
 
     if (dValid) {
@@ -650,11 +645,13 @@ async function setStatus(id, status) {
   return true;
 }
 
+async function refreshPreview() { if (!active) return; await openQuotePreview(active.id); loadHistory(); refreshBell(); }
+
 const quoteStatusSelect = $('#quote-status-select');
 if (quoteStatusSelect) {
   quoteStatusSelect.addEventListener('change', async (e) => {
     if (!active) return;
-    if (await setStatus(active.id, e.target.value)) { toast('Estado actualizado'); loadHistory(); }
+    if (await setStatus(active.id, e.target.value)) { toast('Estado actualizado'); refreshPreview(); }
   });
 }
 
@@ -682,7 +679,7 @@ if (bSendWhatsapp) {
     toast('Abriendo WhatsApp. Recuerda adjuntar el PDF descargado.');
     if (active) {
       const { data } = await db.from('quotes').select('status').eq('id', active.id).single();
-      if (data?.status === 'borrador') { await setStatus(active.id, 'emitido'); loadHistory(); }
+      if (data?.status === 'borrador' && (await setStatus(active.id, 'emitido'))) refreshPreview();
     }
   });
 }
@@ -696,7 +693,7 @@ if (bSendEmail) {
     toast('Recuerda adjuntar el PDF descargado.');
     if (active) {
       const { data } = await db.from('quotes').select('status').eq('id', active.id).single();
-      if (data?.status === 'borrador') { await setStatus(active.id, 'emitido'); loadHistory(); }
+      if (data?.status === 'borrador' && (await setStatus(active.id, 'emitido'))) refreshPreview();
     }
   });
 }
@@ -1065,9 +1062,22 @@ if (fPass) {
     if (f.elements.p1.value !== f.elements.p2.value) return err('Las dos contraseñas no coinciden.');
     const { error } = await db.auth.updateUser({ password: f.elements.p1.value });
     if (error) return err(error.message);
-    $('#dlg-pass').close(); toast('Contraseña cambiada'); }); }  async function boot() { setupRealtimeValidation(); await loadCompany(); restoreQuoteDraft(); try { await db.rpc('run_followups'); } catch (e) { /* fallback */ } loadDashboard(); refreshBell(); cacheServices(); loadClients(); }  /* ---------- Navegación ---------- */ $$('.sidebar .nav-btn[data-target]').forEach((btn) => btn.addEventListener('click', () => {
-  $$('.sidebar .nav-btn[data-target]').forEach((b) => b.classList.toggle('on', b === btn)); const target = btn.dataset.target; $$
-('.main-content .tab-section').forEach((sec) => (sec.hidden = sec.id !== `sec-${target}`));
+    $('#dlg-pass').close(); toast('Contraseña cambiada');
+  });
+}
+
+async function boot() {
+  await loadCompany();
+  restoreQuoteDraft();
+  try { await db.rpc('run_followups'); } catch (e) { /* si falta la migración, se ignora */ }
+  loadDashboard(); refreshBell(); cacheServices(); loadClients();
+}
+
+/* ---------- Navegación ---------- */
+$$('.sidebar .nav-btn[data-target]').forEach((btn) => btn.addEventListener('click', () => {
+  $$('.sidebar .nav-btn[data-target]').forEach((b) => b.classList.toggle('on', b === btn));
+  const target = btn.dataset.target;
+  $$('.main-content .tab-section').forEach((sec) => (sec.hidden = sec.id !== `sec-${target}`));
   if (target === 'inicio') loadDashboard();
   if (target === 'tareas') loadTasks();
   if (target === 'presupuestos') cacheServices();
@@ -1080,7 +1090,7 @@ if (fPass) {
 let appShown = false;
 db.auth.onAuthStateChange((event, session) => {
   if (event === 'PASSWORD_RECOVERY') { appShown = false; return show('recovery'); }
-  if (!session) { appShown = false; services = []; lines = []; clients = []; active = null; tasks = []; const dash = $('#dash'); if(dash) dash.innerHTML = ''; const bc = $('#bell-count'); if(bc) bc.hidden = true; company = { ...company, company_name: '', phone: '', email: '', terms: '', company_nif: '', company_address: '' }; return show('login'); }
+  if (!session) { appShown = false; services = []; lines = []; clients = []; active = null; tasks = []; clearQuoteDraft(); const dash = $('#dash'); if(dash) dash.innerHTML = ''; const bc = $('#bell-count'); if(bc) bc.hidden = true; company = { ...company, company_name: '', phone: '', email: '', terms: '', company_nif: '', company_address: '' }; return show('login'); }
   if (!appShown) {
     appShown = true;
     show('app');
@@ -1289,7 +1299,7 @@ function openForm(c) {
   for (const k of ['name', 'phone', 'email', 'locality', 'address', 'nif', 'kind', 'notes']) if(f.elements[k]) f.elements[k].value = c?.[k] ?? (k === 'kind' ? 'particular' : '');
   $('#d-err').hidden = true;
   $('#d-delete').hidden = !c;
-  $('#dlg').showModal(); $$('#dlg .validate-field').forEach((el) => el.dispatchEvent(new Event('input', { bubbles: true })));
+  $('#dlg').showModal(); validateAll($('#dlg'));
 }
 
 async function findDuplicates(v) {
