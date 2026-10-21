@@ -488,3 +488,7 @@ dialog::backdrop { background: #0006; }
 .task-chk { display: flex; flex-direction: row; align-items: center; gap: 10px; flex: 1; cursor: pointer; font-size: 13px; color: var(--text); }
 .task-done { text-decoration: line-through; color: var(--muted); }
 details.card summary { cursor: pointer; font-weight: 600; color: var(--brand); }
+/* Presupuesto / PDF: el texto se ajusta de línea y la tabla nunca desborda su caja
+   (sin esto, los nombres largos empujaban las columnas Precio y Total fuera del PDF) */
+.pdf-doc table { width: 100%; table-layout: fixed; }
+.pdf-doc th, .pdf-doc td { white-space: normal; overflow-wrap: anywhere; }
